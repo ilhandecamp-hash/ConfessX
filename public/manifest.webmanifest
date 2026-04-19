@@ -1,0 +1,20 @@
+{
+  "name": "ConfessX",
+  "short_name": "ConfessX",
+  "description": "Confessions 100% anonymes — lâche ton secret.",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#0a0a0a",
+  "theme_color": "#0a0a0a",
+  "orientation": "portrait",
+  "lang": "fr",
+  "icons": [
+    {
+      "src": "/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}

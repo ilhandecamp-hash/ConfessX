@@ -1,13 +1,29 @@
 "use client";
 
-import { Send } from "lucide-react";
+import { Send, X } from "lucide-react";
 import { useState } from "react";
 import { getOrCreateDeviceToken } from "@/lib/device";
 import { MAX_COMMENT_LENGTH } from "@/types/post";
 import { moderate } from "@/lib/moderation";
 import { cn } from "@/lib/utils";
 
-export function CommentForm({ postId, onPosted }: { postId: string; onPosted: () => void }) {
+interface Props {
+  postId: string;
+  onPosted: () => void;
+  parentId?: string | null;
+  autoFocus?: boolean;
+  onCancel?: () => void;
+  placeholder?: string;
+}
+
+export function CommentForm({
+  postId,
+  onPosted,
+  parentId = null,
+  autoFocus = false,
+  onCancel,
+  placeholder = "Donne ton avis anonymement…",
+}: Props) {
   const [content, setContent] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -30,7 +46,7 @@ export function CommentForm({ postId, onPosted }: { postId: string; onPosted: ()
       const res = await fetch(`/api/posts/${postId}/comments`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ content: text, device_token: token }),
+        body: JSON.stringify({ content: text, device_token: token, parent_id: parentId }),
       });
       const data = await res.json();
       if (!res.ok) {
@@ -52,8 +68,9 @@ export function CommentForm({ postId, onPosted }: { postId: string; onPosted: ()
         <textarea
           value={content}
           onChange={(e) => setContent(e.target.value.slice(0, MAX_COMMENT_LENGTH))}
-          placeholder="Donne ton avis anonymement…"
+          placeholder={placeholder}
           rows={2}
+          autoFocus={autoFocus}
           className="w-full resize-none bg-transparent text-sm leading-relaxed placeholder-neutral-600 focus:outline-none"
         />
         <div className="flex items-center justify-between pt-1">
@@ -65,19 +82,29 @@ export function CommentForm({ postId, onPosted }: { postId: string; onPosted: ()
           >
             {remaining}
           </span>
-          <button
-            type="submit"
-            disabled={busy || content.trim().length < 1}
-            className="flex items-center gap-1.5 rounded-full bg-brand px-3 py-1.5 text-xs font-bold text-white transition hover:bg-brand-hover disabled:opacity-40"
-          >
-            <Send className="h-3 w-3" />
-            {busy ? "…" : "Publier"}
-          </button>
+          <div className="flex items-center gap-2">
+            {onCancel && (
+              <button
+                type="button"
+                onClick={onCancel}
+                className="flex items-center gap-1 rounded-full border border-border px-3 py-1.5 text-xs text-neutral-400 hover:text-neutral-100"
+              >
+                <X className="h-3 w-3" />
+                Annuler
+              </button>
+            )}
+            <button
+              type="submit"
+              disabled={busy || content.trim().length < 1}
+              className="flex items-center gap-1.5 rounded-full bg-brand px-3 py-1.5 text-xs font-bold text-white transition hover:bg-brand-hover disabled:opacity-40"
+            >
+              <Send className="h-3 w-3" />
+              {busy ? "…" : parentId ? "Répondre" : "Publier"}
+            </button>
+          </div>
         </div>
       </div>
-      {error && (
-        <p className="text-xs text-red-400">{error}</p>
-      )}
+      {error && <p className="text-xs text-red-400">{error}</p>}
     </form>
   );
 }

@@ -29,6 +29,8 @@ export type Database = {
           view_count: number;
           is_highlight: boolean;
           trending_score: number;
+          hot_score: number;
+          nsfw: boolean;
           created_at: string;
           updated_at: string | null;
           author_token: string | null;
@@ -39,6 +41,7 @@ export type Database = {
           category: Category;
           mode: PostMode;
           status?: PostStatus;
+          nsfw?: boolean;
           author_token?: string | null;
           created_at?: string;
         };
@@ -57,6 +60,8 @@ export type Database = {
           view_count?: number;
           is_highlight?: boolean;
           trending_score?: number;
+          hot_score?: number;
+          nsfw?: boolean;
           updated_at?: string | null;
           author_token?: string | null;
         };
@@ -98,6 +103,7 @@ export type Database = {
         Row: {
           id: string;
           post_id: string;
+          parent_id: string | null;
           content: string;
           author_token: string | null;
           status: PostStatus;
@@ -110,6 +116,7 @@ export type Database = {
         };
         Insert: {
           post_id: string;
+          parent_id?: string | null;
           content: string;
           author_token?: string | null;
           status?: PostStatus;
@@ -185,8 +192,26 @@ export type Database = {
         Returns: boolean;
       };
       add_comment: {
-        Args: { p_post_id: string; p_content: string; p_author_token: string | null };
+        Args: {
+          p_post_id: string;
+          p_content: string;
+          p_author_token: string | null;
+          p_parent_id?: string | null;
+        };
         Returns: string;
+      };
+      get_karma: {
+        Args: { p_author_token: string };
+        Returns: {
+          posts_count: number;
+          votes_received: number;
+          views_received: number;
+          comments_count: number;
+        }[];
+      };
+      recalc_hot_scores: {
+        Args: Record<string, never>;
+        Returns: void;
       };
       delete_comment: {
         Args: { p_comment_id: string; p_author_token: string };

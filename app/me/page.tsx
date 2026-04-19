@@ -1,13 +1,17 @@
 "use client";
 
 import Link from "next/link";
-import { ArrowLeft, MessageCircle, RefreshCw } from "lucide-react";
+import { ArrowLeft, Eye, MessageCircle, RefreshCw, ThumbsUp } from "lucide-react";
 import { useEffect, useState } from "react";
 import { PostCard } from "@/components/PostCard";
+import { FeedSkeleton } from "@/components/Skeleton";
 import { getOrCreateDeviceToken, resetDeviceToken } from "@/lib/device";
+import { compactNumber } from "@/lib/utils";
+import { useOwnership } from "@/contexts/OwnershipContext";
 import type { Post } from "@/types/post";
 
 export default function MePage() {
+  const { refresh: refreshOwnership } = useOwnership();
   const [posts, setPosts] = useState<Post[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -35,19 +39,16 @@ export default function MePage() {
     if (!confirm("Réinitialiser ton identifiant anonyme ? Tu perdras l'accès à tes posts existants.")) return;
     resetDeviceToken();
     setPosts([]);
+    void refreshOwnership();
   }
 
   const totalVotes = posts.reduce(
     (s, p) =>
-      s +
-      p.funny_count +
-      p.awkward_count +
-      p.serious_count +
-      p.yes_count +
-      p.no_count,
+      s + p.funny_count + p.awkward_count + p.serious_count + p.yes_count + p.no_count,
     0,
   );
   const totalViews = posts.reduce((s, p) => s + (p.view_count || 0), 0);
+  const karmaScore = totalVotes * 10 + totalViews;
 
   return (
     <div className="space-y-5">
@@ -59,18 +60,25 @@ export default function MePage() {
         Retour
       </Link>
 
-      <div>
-        <h1 className="text-2xl font-extrabold tracking-tight">Mon profil anonyme</h1>
-        <p className="mt-1 text-xs text-neutral-500">
-          Ton identité = ce navigateur. Aucun compte, aucun email, aucune trace sur un serveur.
-        </p>
+      {/* Karma banner */}
+      <div className="overflow-hidden rounded-2xl border border-brand/30 bg-gradient-to-br from-brand/20 via-bg-card to-bg-card p-5">
+        <div className="flex items-center justify-between">
+          <div>
+            <p className="text-[10px] font-semibold uppercase tracking-wider text-brand">Karma</p>
+            <p className="mt-1 text-3xl font-extrabold tabular-nums text-neutral-100">
+              {compactNumber(karmaScore)}
+            </p>
+            <p className="mt-0.5 text-[11px] text-neutral-500">Score anonyme global</p>
+          </div>
+          <ThumbsUp className="h-10 w-10 text-brand/40" />
+        </div>
       </div>
 
-      {/* Stats */}
+      {/* Stats rapides */}
       <div className="grid grid-cols-3 gap-2">
-        <Stat label="Posts" value={posts.length} />
-        <Stat label="Votes reçus" value={totalVotes} />
-        <Stat label="Vues" value={totalViews} />
+        <Stat icon={<MessageCircle className="h-3 w-3" />} label="Posts" value={posts.length} />
+        <Stat icon={<ThumbsUp className="h-3 w-3" />} label="Votes" value={totalVotes} />
+        <Stat icon={<Eye className="h-3 w-3" />} label="Vues" value={totalViews} />
       </div>
 
       <div className="flex items-center justify-between">
@@ -86,7 +94,7 @@ export default function MePage() {
       </div>
 
       {loading ? (
-        <p className="py-6 text-center text-sm text-neutral-500">Chargement…</p>
+        <FeedSkeleton count={2} />
       ) : posts.length === 0 ? (
         <div className="space-y-2 rounded-2xl border border-dashed border-border bg-bg-card p-8 text-center">
           <p className="text-4xl">👻</p>
@@ -109,12 +117,20 @@ export default function MePage() {
   );
 }
 
-function Stat({ label, value }: { label: string; value: number }) {
+function Stat({
+  icon,
+  label,
+  value,
+}: {
+  icon: React.ReactNode;
+  label: string;
+  value: number;
+}) {
   return (
     <div className="rounded-2xl border border-border bg-bg-card p-3 text-center">
-      <div className="text-xl font-extrabold tabular-nums">{value}</div>
+      <div className="text-xl font-extrabold tabular-nums">{compactNumber(value)}</div>
       <div className="mt-0.5 flex items-center justify-center gap-1 text-[10px] uppercase tracking-wider text-neutral-500">
-        {label === "Posts" && <MessageCircle className="h-3 w-3" />}
+        {icon}
         {label}
       </div>
     </div>

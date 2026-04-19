@@ -11,16 +11,36 @@ interface Props {
 
 export function FeedTabs({ tab, onChange }: Props) {
   return (
-    <div className="sticky top-14 z-10 -mx-4 mb-3 border-b border-border bg-bg/90 px-4 py-2 backdrop-blur-md">
+    <div className="sticky top-14 z-10 -mx-4 border-b border-border bg-bg/95 px-4 py-2 backdrop-blur-md">
       <div className="grid grid-cols-2 gap-1 rounded-xl bg-bg-soft p-1">
-        <TabBtn active={tab === "trending"} onClick={() => onChange("trending")} icon={<Flame className="h-4 w-4" />} label="Tendances" />
-        <TabBtn active={tab === "recent"}   onClick={() => onChange("recent")}   icon={<Clock className="h-4 w-4" />}  label="Récents" />
+        <TabBtn
+          active={tab === "trending"}
+          onClick={() => onChange("trending")}
+          icon={<Flame className="h-4 w-4" />}
+          label="Tendances"
+        />
+        <TabBtn
+          active={tab === "recent"}
+          onClick={() => onChange("recent")}
+          icon={<Clock className="h-4 w-4" />}
+          label="Récents"
+        />
       </div>
     </div>
   );
 }
 
-function TabBtn({ active, onClick, icon, label }: { active: boolean; onClick: () => void; icon: React.ReactNode; label: string }) {
+function TabBtn({
+  active,
+  onClick,
+  icon,
+  label,
+}: {
+  active: boolean;
+  onClick: () => void;
+  icon: React.ReactNode;
+  label: string;
+}) {
   return (
     <button
       onClick={onClick}

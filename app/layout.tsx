@@ -1,6 +1,8 @@
 import type { Metadata, Viewport } from "next";
 import { Inter } from "next/font/google";
 import { Header } from "@/components/Header";
+import { ScrollToTop } from "@/components/ScrollToTop";
+import { OwnershipProvider } from "@/contexts/OwnershipContext";
 import "./globals.css";
 
 const inter = Inter({
@@ -14,6 +16,7 @@ export const metadata: Metadata = {
   description:
     "Confessions 100% anonymes. Dis ce que tu n'oses pas dire, vote sur celles des autres, partage le drama.",
   applicationName: "ConfessX",
+  manifest: "/manifest.webmanifest",
   openGraph: {
     title: "ConfessX",
     description: "Confessions anonymes. Drôle, Gênant, Grave — ou juge : en tort ou pas ?",
@@ -24,7 +27,10 @@ export const metadata: Metadata = {
     title: "ConfessX",
     description: "Confessions 100% anonymes.",
   },
-  icons: { icon: "/icon.svg" },
+  icons: {
+    icon: "/icon.svg",
+    apple: "/apple-touch-icon.png",
+  },
 };
 
 export const viewport: Viewport = {
@@ -39,8 +45,11 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   return (
     <html lang="fr" className={`dark ${inter.variable}`}>
       <body className="min-h-screen bg-bg text-neutral-100">
-        <Header />
-        <main className="mx-auto w-full max-w-xl px-4 py-4 pb-20">{children}</main>
+        <OwnershipProvider>
+          <Header />
+          <main className="mx-auto w-full max-w-xl px-4 py-4 pb-20">{children}</main>
+          <ScrollToTop />
+        </OwnershipProvider>
       </body>
     </html>
   );

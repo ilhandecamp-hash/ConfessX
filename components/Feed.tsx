@@ -6,6 +6,7 @@ import { PostCard } from "./PostCard";
 import { FeedTabs } from "./FeedTabs";
 import { HighlightCard } from "./HighlightCard";
 import { SortPicker } from "./SortPicker";
+import { FeedSkeleton } from "./Skeleton";
 
 const PAGE_SIZE = 15;
 
@@ -108,6 +109,8 @@ export function Feed({
         </div>
       )}
 
+      {posts.length === 0 && loading && <FeedSkeleton count={3} />}
+
       {posts.length === 0 && !loading && (
         <div className="rounded-2xl border border-dashed border-border bg-bg-card p-8 text-center">
           <p className="text-sm text-neutral-400">Aucune confession pour l'instant.</p>
@@ -123,7 +126,9 @@ export function Feed({
 
       <div ref={sentinelRef} className="h-8" />
 
-      {loading && <div className="py-4 text-center text-sm text-neutral-500">Chargement…</div>}
+      {loading && posts.length > 0 && (
+        <FeedSkeleton count={2} />
+      )}
       {done && posts.length > 0 && (
         <div className="py-6 text-center text-xs text-neutral-600">— Fin du feed —</div>
       )}

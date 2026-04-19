@@ -53,8 +53,9 @@ export async function GET(req: Request) {
   query = query.range(from, to);
 
   if (tab === "trending") {
+    // Reddit-like hot algorithm (score + recency)
     query = query
-      .order("trending_score", { ascending: false })
+      .order("hot_score", { ascending: false })
       .order("created_at", { ascending: false });
   } else {
     query = query.order("created_at", { ascending: false });
@@ -70,6 +71,7 @@ interface CreateBody {
   content?: unknown;
   category?: unknown;
   mode?: unknown;
+  nsfw?: unknown;
   device_token?: unknown;
 }
 
@@ -93,6 +95,7 @@ export async function POST(req: Request) {
   const content = typeof body.content === "string" ? body.content.trim() : "";
   const category = body.category as Category;
   const mode = body.mode as PostMode;
+  const nsfw = body.nsfw === true;
   const deviceToken = typeof body.device_token === "string" ? body.device_token : "";
 
   const validCategory = ["ecole", "amour", "famille", "argent"].includes(category);
@@ -116,6 +119,7 @@ export async function POST(req: Request) {
       content,
       category,
       mode,
+      nsfw,
       status: "published",
       author_token: author_token || null,
     })

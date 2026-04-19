@@ -22,6 +22,8 @@ export interface Post {
   view_count: number;
   is_highlight: boolean;
   trending_score: number;
+  hot_score: number;
+  nsfw: boolean;
   created_at: string;
   updated_at: string | null;
 }
@@ -29,6 +31,7 @@ export interface Post {
 export interface Comment {
   id: string;
   post_id: string;
+  parent_id: string | null;
   content: string;
   status: PostStatus;
   funny_count: number;
@@ -38,6 +41,15 @@ export interface Comment {
   created_at: string;
   updated_at: string | null;
 }
+
+export interface Karma {
+  posts_count: number;
+  votes_received: number;
+  views_received: number;
+  comments_count: number;
+}
+
+export type CommentSort = "top" | "new";
 
 export const CATEGORIES: { id: Category; label: string; emoji: string }[] = [
   { id: "ecole",   label: "École",   emoji: "🎓" },

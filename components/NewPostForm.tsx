@@ -1,6 +1,6 @@
 "use client";
 
-import { Scale, Send } from "lucide-react";
+import { EyeOff, Scale, Send } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { CategoryPicker } from "./CategoryPicker";
@@ -8,12 +8,15 @@ import { MAX_CONTENT_LENGTH, type Category, type PostMode } from "@/types/post";
 import { moderate } from "@/lib/moderation";
 import { getOrCreateDeviceToken } from "@/lib/device";
 import { cn } from "@/lib/utils";
+import { useOwnership } from "@/contexts/OwnershipContext";
 
 export function NewPostForm() {
   const router = useRouter();
+  const { markOwned } = useOwnership();
   const [content, setContent] = useState("");
   const [category, setCategory] = useState<Category | null>(null);
   const [judgment, setJudgment] = useState(false);
+  const [nsfw, setNsfw] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -42,6 +45,7 @@ export function NewPostForm() {
           content: content.trim(),
           category,
           mode,
+          nsfw,
           device_token,
         }),
       });
@@ -50,6 +54,7 @@ export function NewPostForm() {
         setError(data.error || "Erreur serveur.");
         return;
       }
+      markOwned(data.id);
       router.push(`/post/${data.id}`);
       router.refresh();
     } catch {
@@ -89,28 +94,53 @@ export function NewPostForm() {
         <CategoryPicker value={category} onChange={setCategory} />
       </div>
 
-      <label
-        className={cn(
-          "flex cursor-pointer items-start gap-3 rounded-2xl border border-border bg-bg-card p-4 transition",
-          judgment ? "border-brand/60 bg-brand/5" : "hover:border-border-strong",
-        )}
-      >
-        <input
-          type="checkbox"
-          checked={judgment}
-          onChange={(e) => setJudgment(e.target.checked)}
-          className="mt-0.5 h-4 w-4 accent-brand"
-        />
-        <div className="flex-1">
-          <div className="flex items-center gap-2 text-sm font-semibold text-neutral-100">
-            <Scale className="h-4 w-4 text-brand" />
-            Mode « Suis-je en tort ? »
+      <div className="space-y-2">
+        <label
+          className={cn(
+            "flex cursor-pointer items-start gap-3 rounded-2xl border border-border bg-bg-card p-4 transition",
+            judgment ? "border-brand/60 bg-brand/5" : "hover:border-border-strong",
+          )}
+        >
+          <input
+            type="checkbox"
+            checked={judgment}
+            onChange={(e) => setJudgment(e.target.checked)}
+            className="mt-0.5 h-4 w-4 accent-brand"
+          />
+          <div className="flex-1">
+            <div className="flex items-center gap-2 text-sm font-semibold text-neutral-100">
+              <Scale className="h-4 w-4 text-brand" />
+              Mode « Suis-je en tort ? »
+            </div>
+            <p className="mt-0.5 text-xs text-neutral-500">
+              Les autres voteront Oui / Non à la place de 😂😳💀.
+            </p>
           </div>
-          <p className="mt-0.5 text-xs text-neutral-500">
-            Les autres voteront Oui / Non à la place de 😂😳💀.
-          </p>
-        </div>
-      </label>
+        </label>
+
+        <label
+          className={cn(
+            "flex cursor-pointer items-start gap-3 rounded-2xl border border-border bg-bg-card p-4 transition",
+            nsfw ? "border-red-500/60 bg-red-500/5" : "hover:border-border-strong",
+          )}
+        >
+          <input
+            type="checkbox"
+            checked={nsfw}
+            onChange={(e) => setNsfw(e.target.checked)}
+            className="mt-0.5 h-4 w-4 accent-red-500"
+          />
+          <div className="flex-1">
+            <div className="flex items-center gap-2 text-sm font-semibold text-neutral-100">
+              <EyeOff className="h-4 w-4 text-red-400" />
+              Contenu sensible (NSFW)
+            </div>
+            <p className="mt-0.5 text-xs text-neutral-500">
+              Le post sera flouté jusqu'à ce qu'on clique pour afficher.
+            </p>
+          </div>
+        </label>
+      </div>
 
       {error && (
         <div className="rounded-xl border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-400">

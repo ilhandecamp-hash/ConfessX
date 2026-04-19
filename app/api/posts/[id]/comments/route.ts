@@ -10,16 +10,31 @@ export const dynamic = "force-dynamic";
 
 interface Params { params: { id: string } }
 
-// GET /api/posts/:id/comments
-export async function GET(_req: Request, { params }: Params) {
+// GET /api/posts/:id/comments?sort=top|new
+export async function GET(req: Request, { params }: Params) {
+  const url = new URL(req.url);
+  const sort = url.searchParams.get("sort") || "new";
+
   const supabase = createAnonServerClient();
-  const { data, error } = await supabase
+  let query = supabase
     .from("comments")
-    .select("id,post_id,content,status,funny_count,awkward_count,serious_count,report_count,created_at,updated_at")
+    .select("id,post_id,parent_id,content,status,funny_count,awkward_count,serious_count,report_count,created_at,updated_at")
     .eq("post_id", params.id)
     .eq("status", "published")
-    .order("created_at", { ascending: true })
-    .limit(200);
+    .limit(500);
+
+  if (sort === "top") {
+    // Synthetic "score" order: serious + awkward + funny (desc) then newest
+    query = query
+      .order("serious_count", { ascending: false })
+      .order("awkward_count", { ascending: false })
+      .order("funny_count", { ascending: false })
+      .order("created_at", { ascending: false });
+  } else {
+    query = query.order("created_at", { ascending: true });
+  }
+
+  const { data, error } = await query;
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
   return NextResponse.json({ comments: data ?? [] });
 }
@@ -30,7 +45,7 @@ export async function POST(req: Request, { params }: Params) {
   const rl = rateLimit(`comment:${fingerprint}`, 10, 60_000);
   if (!rl.ok) return NextResponse.json({ error: "Rate limit." }, { status: 429 });
 
-  let body: { content?: unknown; device_token?: unknown };
+  let body: { content?: unknown; device_token?: unknown; parent_id?: unknown };
   try {
     body = await req.json();
   } catch {
@@ -39,6 +54,9 @@ export async function POST(req: Request, { params }: Params) {
 
   const content = typeof body.content === "string" ? body.content.trim() : "";
   const deviceToken = typeof body.device_token === "string" ? body.device_token : "";
+  const parentId =
+    typeof body.parent_id === "string" && body.parent_id.length > 0 ? body.parent_id : null;
+
   if (content.length < 1 || content.length > 500) {
     return NextResponse.json({ error: "Commentaire 1-500 caractères." }, { status: 422 });
   }
@@ -52,6 +70,7 @@ export async function POST(req: Request, { params }: Params) {
     p_post_id: params.id,
     p_content: content,
     p_author_token: author || null,
+    p_parent_id: parentId,
   });
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
   return NextResponse.json({ id: data }, { status: 201 });

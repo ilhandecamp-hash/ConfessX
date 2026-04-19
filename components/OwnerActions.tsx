@@ -1,12 +1,13 @@
 "use client";
 
 import { Pencil, Trash2 } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { peekDeviceToken } from "@/lib/device";
 import { EDIT_WINDOW_MINUTES, MAX_CONTENT_LENGTH, type Post } from "@/types/post";
 import { Modal } from "./Modal";
 import { cn } from "@/lib/utils";
+import { useOwnership } from "@/contexts/OwnershipContext";
 
 interface Props {
   post: Post;
@@ -16,39 +17,13 @@ interface Props {
 
 export function OwnerActions({ post, onDeleted, onEdited }: Props) {
   const router = useRouter();
-  const [isOwner, setIsOwner] = useState<boolean | null>(null);
+  const { isOwner, refresh } = useOwnership();
   const [editOpen, setEditOpen] = useState(false);
   const [content, setContent] = useState(post.content);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // On marque comme "owner" si le device possède un token et qu'on a posté ce post.
-  // On n'a pas accès au author_token en DB côté client — on infère via /api/posts/mine.
-  useEffect(() => {
-    const token = peekDeviceToken();
-    if (!token) {
-      setIsOwner(false);
-      return;
-    }
-    let cancelled = false;
-    (async () => {
-      try {
-        const res = await fetch("/api/posts/mine", {
-          headers: { "x-device-token": token },
-        });
-        if (!res.ok) return setIsOwner(false);
-        const { posts } = await res.json();
-        if (!cancelled) setIsOwner((posts as { id: string }[]).some((p) => p.id === post.id));
-      } catch {
-        if (!cancelled) setIsOwner(false);
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, [post.id]);
-
-  if (!isOwner) return null;
+  if (!isOwner(post.id)) return null;
 
   const minutesSince = (Date.now() - new Date(post.created_at).getTime()) / 60000;
   const canEdit = minutesSince <= EDIT_WINDOW_MINUTES;
@@ -65,6 +40,7 @@ export function OwnerActions({ post, onDeleted, onEdited }: Props) {
       });
       if (res.ok) {
         onDeleted?.();
+        await refresh();
         router.refresh();
       }
     } finally {

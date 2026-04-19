@@ -1,11 +1,14 @@
 "use client";
 
-import { Trash2 } from "lucide-react";
-import { useEffect, useState } from "react";
+import { Reply, Trash2 } from "lucide-react";
+import { useState } from "react";
 import { peekDeviceToken } from "@/lib/device";
 import { formatRelative, cn, compactNumber } from "@/lib/utils";
+import { renderRichText } from "@/lib/markdown";
 import type { Comment, CommentVoteType } from "@/types/post";
 import { ReportButton } from "./ReportButton";
+import { Avatar } from "./Avatar";
+import { CommentForm } from "./CommentForm";
 
 const STORAGE_KEY = "confessx_comment_votes";
 
@@ -33,10 +36,13 @@ const BTNS: { type: CommentVoteType; emoji: string; title: string }[] = [
 
 interface Props {
   comment: Comment;
+  postId: string;
   onDeleted: (id: string) => void;
+  onReplyPosted: () => void;
+  isReply?: boolean;
 }
 
-export function CommentCard({ comment, onDeleted }: Props) {
+export function CommentCard({ comment, postId, onDeleted, onReplyPosted, isReply }: Props) {
   const [counts, setCounts] = useState({
     funny: comment.funny_count,
     awkward: comment.awkward_count,
@@ -45,13 +51,7 @@ export function CommentCard({ comment, onDeleted }: Props) {
   const [voted, setVoted] = useState<CommentVoteType[]>(() =>
     typeof window === "undefined" ? [] : readMap()[comment.id] || [],
   );
-  const [isOwner, setIsOwner] = useState(false);
-
-  useEffect(() => {
-    // On ne connaît pas le author_token client — le backend valide.
-    // On affiche le bouton delete si le device a un token; la route rejettera si pas autorisé.
-    setIsOwner(!!peekDeviceToken());
-  }, []);
+  const [replyOpen, setReplyOpen] = useState(false);
 
   async function onVote(type: CommentVoteType) {
     if (voted.includes(type)) return;
@@ -94,14 +94,18 @@ export function CommentCard({ comment, onDeleted }: Props) {
   }
 
   return (
-    <div className="rounded-xl border border-border bg-bg-soft p-3">
-      <div className="mb-2 flex items-center justify-between text-[11px] text-neutral-500">
-        <span>Anonyme · {formatRelative(comment.created_at)}</span>
+    <div className={cn("rounded-xl border border-border bg-bg-soft p-3", isReply && "bg-bg-card")}>
+      <div className="mb-2 flex items-center gap-2">
+        <Avatar seed={comment.id} />
+        <span className="text-[11px] text-neutral-500">
+          Anonyme · {formatRelative(comment.created_at)}
+          {comment.updated_at && " · modifié"}
+        </span>
       </div>
-      <p className="whitespace-pre-wrap break-words text-sm leading-relaxed text-neutral-100">
-        {comment.content}
+      <p className="mb-2 whitespace-pre-wrap break-words pl-8 text-sm leading-relaxed text-neutral-100">
+        {renderRichText(comment.content)}
       </p>
-      <div className="mt-2 flex items-center justify-between">
+      <div className="flex items-center justify-between pl-8">
         <div className="flex items-center gap-1">
           {BTNS.map(({ type, emoji, title }) => {
             const isVoted = voted.includes(type);
@@ -125,17 +129,41 @@ export function CommentCard({ comment, onDeleted }: Props) {
           })}
         </div>
         <div className="flex items-center gap-3">
-          {isOwner && (
+          {!isReply && (
             <button
-              onClick={onDelete}
-              className="flex items-center gap-1 text-[11px] text-neutral-500 transition hover:text-red-400"
+              onClick={() => setReplyOpen((o) => !o)}
+              className="flex items-center gap-1 text-[11px] text-neutral-500 transition hover:text-neutral-100"
             >
-              <Trash2 className="h-3 w-3" />
+              <Reply className="h-3 w-3" />
+              Répondre
             </button>
           )}
+          <button
+            onClick={onDelete}
+            className="flex items-center gap-1 text-[11px] text-neutral-500 transition hover:text-red-400"
+            title="Supprimer (auteur seulement)"
+          >
+            <Trash2 className="h-3 w-3" />
+          </button>
           <ReportButton commentId={comment.id} compact />
         </div>
       </div>
+
+      {replyOpen && !isReply && (
+        <div className="mt-3 pl-8">
+          <CommentForm
+            postId={postId}
+            parentId={comment.id}
+            autoFocus
+            onCancel={() => setReplyOpen(false)}
+            placeholder="Répondre à ce commentaire…"
+            onPosted={() => {
+              setReplyOpen(false);
+              onReplyPosted();
+            }}
+          />
+        </div>
+      )}
     </div>
   );
 }

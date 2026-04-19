@@ -1,16 +1,19 @@
 "use client";
 
 import Link from "next/link";
-import { Eye, Scale } from "lucide-react";
+import { Eye, MessageCircle, Scale } from "lucide-react";
 import { useState } from "react";
 import { CATEGORIES, type Post } from "@/types/post";
 import { cn, compactNumber, formatRelative } from "@/lib/utils";
+import { renderRichText } from "@/lib/markdown";
 import { VoteBar } from "./VoteBar";
 import { JudgmentBar } from "./JudgmentBar";
 import { ReportButton } from "./ReportButton";
 import { ShareButton } from "./ShareButton";
 import { BookmarkButton } from "./BookmarkButton";
 import { OwnerActions } from "./OwnerActions";
+import { Avatar } from "./Avatar";
+import { NsfwGate } from "./NsfwGate";
 
 interface Props {
   post: Post;
@@ -33,6 +36,12 @@ export function PostCard({ post: initial, highlight = false, linkToDetail = true
     );
   }
 
+  const body = (
+    <p className="mb-4 whitespace-pre-wrap break-words text-[15px] leading-relaxed text-neutral-100">
+      {renderRichText(post.content)}
+    </p>
+  );
+
   return (
     <article
       className={cn(
@@ -44,6 +53,7 @@ export function PostCard({ post: initial, highlight = false, linkToDetail = true
       {/* Header */}
       <header className="mb-3 flex items-center justify-between">
         <div className="flex items-center gap-2">
+          <Avatar seed={post.id} />
           <Link
             href={`/c/${post.category}`}
             className="flex items-center gap-1 rounded-full bg-bg-soft px-2 py-0.5 text-[11px] font-medium text-neutral-300 transition hover:bg-border"
@@ -55,6 +65,11 @@ export function PostCard({ post: initial, highlight = false, linkToDetail = true
             <span className="flex items-center gap-1 rounded-full bg-brand/15 px-2 py-0.5 text-[11px] font-medium text-brand">
               <Scale className="h-3 w-3" />
               Jugement
+            </span>
+          )}
+          {post.nsfw && (
+            <span className="rounded-full bg-red-500/20 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-red-400">
+              NSFW
             </span>
           )}
           {highlight && (
@@ -69,17 +84,23 @@ export function PostCard({ post: initial, highlight = false, linkToDetail = true
         </span>
       </header>
 
-      {/* Content */}
-      {linkToDetail ? (
+      {/* Content (avec gate NSFW si flag) */}
+      {post.nsfw ? (
+        <NsfwGate>
+          {linkToDetail ? (
+            <Link href={`/post/${post.id}`} className="block">
+              {body}
+            </Link>
+          ) : (
+            body
+          )}
+        </NsfwGate>
+      ) : linkToDetail ? (
         <Link href={`/post/${post.id}`} className="block">
-          <p className="mb-4 whitespace-pre-wrap break-words text-[15px] leading-relaxed text-neutral-100">
-            {post.content}
-          </p>
+          {body}
         </Link>
       ) : (
-        <p className="mb-4 whitespace-pre-wrap break-words text-[15px] leading-relaxed text-neutral-100">
-          {post.content}
-        </p>
+        body
       )}
 
       {/* Voting */}
@@ -87,11 +108,20 @@ export function PostCard({ post: initial, highlight = false, linkToDetail = true
 
       {/* Footer */}
       <footer className="mt-3 flex flex-wrap items-center justify-between gap-2">
-        <div className="flex items-center gap-3">
-          <span className="flex items-center gap-1 text-[11px] text-neutral-600">
+        <div className="flex items-center gap-3 text-[11px] text-neutral-600">
+          <span className="flex items-center gap-1">
             <Eye className="h-3 w-3" />
             {compactNumber(post.view_count || 0)}
           </span>
+          {linkToDetail && (
+            <Link
+              href={`/post/${post.id}#comments`}
+              className="flex items-center gap-1 transition hover:text-neutral-100"
+            >
+              <MessageCircle className="h-3 w-3" />
+              Commenter
+            </Link>
+          )}
           <OwnerActions
             post={post}
             onDeleted={() => setDeleted(true)}
