@@ -7,7 +7,10 @@ import type {
   VoteType,
 } from "@/types/post";
 
-export interface Database {
+export type Database = {
+  __InternalSupabase: {
+    PostgrestVersion: "12";
+  };
   public: {
     Tables: {
       posts: {
@@ -39,7 +42,25 @@ export interface Database {
           author_token?: string | null;
           created_at?: string;
         };
-        Update: Partial<Database["public"]["Tables"]["posts"]["Row"]>;
+        Update: {
+          id?: string;
+          content?: string;
+          category?: Category;
+          mode?: PostMode;
+          status?: PostStatus;
+          funny_count?: number;
+          awkward_count?: number;
+          serious_count?: number;
+          yes_count?: number;
+          no_count?: number;
+          report_count?: number;
+          view_count?: number;
+          is_highlight?: boolean;
+          trending_score?: number;
+          updated_at?: string | null;
+          author_token?: string | null;
+        };
+        Relationships: [];
       };
       reports: {
         Row: {
@@ -49,8 +70,13 @@ export interface Database {
           reason: ReportReason | null;
           created_at: string;
         };
-        Insert: { post_id: string; fingerprint: string; reason?: ReportReason | null };
-        Update: never;
+        Insert: {
+          post_id: string;
+          fingerprint: string;
+          reason?: ReportReason | null;
+        };
+        Update: { [_ in never]: never };
+        Relationships: [];
       };
       votes: {
         Row: {
@@ -60,8 +86,13 @@ export interface Database {
           vote_type: VoteType;
           created_at: string;
         };
-        Insert: { post_id: string; fingerprint: string; vote_type: VoteType };
-        Update: never;
+        Insert: {
+          post_id: string;
+          fingerprint: string;
+          vote_type: VoteType;
+        };
+        Update: { [_ in never]: never };
+        Relationships: [];
       };
       comments: {
         Row: {
@@ -83,7 +114,16 @@ export interface Database {
           author_token?: string | null;
           status?: PostStatus;
         };
-        Update: Partial<Database["public"]["Tables"]["comments"]["Row"]>;
+        Update: {
+          content?: string;
+          status?: PostStatus;
+          funny_count?: number;
+          awkward_count?: number;
+          serious_count?: number;
+          report_count?: number;
+          updated_at?: string | null;
+        };
+        Relationships: [];
       };
       comment_votes: {
         Row: {
@@ -93,8 +133,13 @@ export interface Database {
           vote_type: CommentVoteType;
           created_at: string;
         };
-        Insert: { comment_id: string; fingerprint: string; vote_type: CommentVoteType };
-        Update: never;
+        Insert: {
+          comment_id: string;
+          fingerprint: string;
+          vote_type: CommentVoteType;
+        };
+        Update: { [_ in never]: never };
+        Relationships: [];
       };
       comment_reports: {
         Row: {
@@ -104,16 +149,25 @@ export interface Database {
           reason: ReportReason | null;
           created_at: string;
         };
-        Insert: { comment_id: string; fingerprint: string; reason?: ReportReason | null };
-        Update: never;
+        Insert: {
+          comment_id: string;
+          fingerprint: string;
+          reason?: ReportReason | null;
+        };
+        Update: { [_ in never]: never };
+        Relationships: [];
       };
     };
+    Views: { [_ in never]: never };
     Functions: {
       increment_vote: {
         Args: { p_post_id: string; p_vote_type: VoteType; p_fingerprint: string };
         Returns: boolean;
       };
-      increment_view: { Args: { p_post_id: string }; Returns: void };
+      increment_view: {
+        Args: { p_post_id: string };
+        Returns: void;
+      };
       report_post: {
         Args: { p_post_id: string; p_fingerprint: string; p_reason?: ReportReason | null };
         Returns: boolean;
@@ -122,13 +176,16 @@ export interface Database {
         Args: { p_comment_id: string; p_fingerprint: string; p_reason?: ReportReason | null };
         Returns: boolean;
       };
-      delete_post: { Args: { p_post_id: string; p_author_token: string }; Returns: boolean };
+      delete_post: {
+        Args: { p_post_id: string; p_author_token: string };
+        Returns: boolean;
+      };
       update_post: {
         Args: { p_post_id: string; p_author_token: string; p_content: string };
         Returns: boolean;
       };
       add_comment: {
-        Args: { p_post_id: string; p_content: string; p_author_token: string };
+        Args: { p_post_id: string; p_content: string; p_author_token: string | null };
         Returns: string;
       };
       delete_comment: {
@@ -139,9 +196,20 @@ export interface Database {
         Args: { p_comment_id: string; p_vote_type: CommentVoteType; p_fingerprint: string };
         Returns: boolean;
       };
-      search_posts: { Args: { p_query: string; p_limit?: number }; Returns: unknown };
-      recalc_trending_scores: { Args: Record<string, never>; Returns: void };
-      pick_daily_highlight: { Args: Record<string, never>; Returns: void };
+      search_posts: {
+        Args: { p_query: string; p_limit?: number };
+        Returns: Database["public"]["Tables"]["posts"]["Row"][];
+      };
+      recalc_trending_scores: {
+        Args: Record<string, never>;
+        Returns: void;
+      };
+      pick_daily_highlight: {
+        Args: Record<string, never>;
+        Returns: void;
+      };
     };
+    Enums: { [_ in never]: never };
+    CompositeTypes: { [_ in never]: never };
   };
-}
+};

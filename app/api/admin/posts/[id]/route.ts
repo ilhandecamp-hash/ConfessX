@@ -36,7 +36,7 @@ export async function PATCH(req: Request, { params }: Params) {
   }
 
   const supabase = createServiceClient();
-  const update: Record<string, unknown> = { status };
+  const update: { status: PostStatus; report_count?: number } = { status };
   if (status === "published") update.report_count = 0;
   const { error } = await supabase.from("posts").update(update).eq("id", params.id);
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
