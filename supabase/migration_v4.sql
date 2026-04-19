@@ -99,22 +99,19 @@ grant execute on function public.username_available(text) to anon, authenticated
 
 -- 6) RPC lookup_email_by_username ------------------------------------
 -- Permet login avec username : on convertit username → email pour Supabase Auth.
+-- En pur SQL avec JOIN (pas de SELECT INTO qui casse le parser Supabase).
 create or replace function public.lookup_email_by_username(p_username text)
 returns text
-language plpgsql
+language sql
+stable
 security definer
 set search_path = public, auth
 as $$
-declare
-    v_id uuid;
-    v_email text;
-begin
-    -- On garde cette fonction pour le backend seulement (grant restrictif).
-    select id into v_id from public.profiles where lower(username) = lower(p_username);
-    if v_id is null then return null; end if;
-    select email into v_email from auth.users where id = v_id;
-    return v_email;
-end;
+    select u.email::text
+    from auth.users u
+    join public.profiles p on p.id = u.id
+    where lower(p.username) = lower(p_username)
+    limit 1;
 $$;
 
 grant execute on function public.lookup_email_by_username(text) to service_role;
