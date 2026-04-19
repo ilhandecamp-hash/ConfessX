@@ -12,24 +12,27 @@ const inter = Inter({
 });
 
 export const metadata: Metadata = {
-  title: "ConfessX — Lâche ton secret, anonymement.",
+  title: "ConfessX — Le site de confessions anonymes.",
   description:
     "Confessions 100% anonymes. Dis ce que tu n'oses pas dire, vote sur celles des autres, partage le drama.",
   applicationName: "ConfessX",
   manifest: "/manifest.webmanifest",
   openGraph: {
     title: "ConfessX",
-    description: "Confessions anonymes. Drôle, Gênant, Grave — ou juge : en tort ou pas ?",
+    description: "Le site de confessions anonymes — drôle, gênant, grave.",
     type: "website",
+    images: [{ url: "/banner.png", width: 1200, height: 520, alt: "ConfessX" }],
   },
   twitter: {
     card: "summary_large_image",
     title: "ConfessX",
-    description: "Confessions 100% anonymes.",
+    description: "Le site de confessions anonymes.",
+    images: ["/banner.png"],
   },
   icons: {
-    icon: "/icon.svg",
-    apple: "/apple-touch-icon.png",
+    icon: "/logo.png",
+    apple: "/logo.png",
+    shortcut: "/logo.png",
   },
 };
 

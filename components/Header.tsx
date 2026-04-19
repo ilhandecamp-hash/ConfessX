@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import Image from "next/image";
 import { Bookmark, Plus, User } from "lucide-react";
 import { SearchBar } from "./SearchBar";
 
@@ -8,13 +9,15 @@ export function Header() {
   return (
     <header className="sticky top-0 z-20 border-b border-border bg-bg/85 backdrop-blur-md">
       <div className="mx-auto flex h-14 max-w-xl items-center justify-between gap-2 px-4">
-        <Link href="/" className="flex shrink-0 items-center gap-2">
-          <span className="grid h-7 w-7 place-items-center rounded-lg bg-brand font-black text-white">
-            C
-          </span>
-          <span className="hidden text-base font-extrabold tracking-tight sm:inline">
-            Confess<span className="text-brand">X</span>
-          </span>
+        <Link href="/" className="flex shrink-0 items-center gap-2" aria-label="ConfessX — Accueil">
+          <Image
+            src="/logo.png"
+            alt="ConfessX"
+            width={36}
+            height={36}
+            priority
+            className="h-9 w-9 object-contain"
+          />
         </Link>
 
         <div className="min-w-0 flex-1">

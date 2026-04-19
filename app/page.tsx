@@ -1,3 +1,4 @@
+import { BannerHero } from "@/components/BannerHero";
 import { Feed } from "@/components/Feed";
 import { createAnonServerClient } from "@/lib/supabase/server";
 import type { Post } from "@/types/post";
@@ -28,5 +29,10 @@ export default async function HomePage() {
   const initialPosts = (trending ?? []) as Post[];
   const highlightPost = (highlight ?? null) as Post | null;
 
-  return <Feed initialPosts={initialPosts} highlight={highlightPost} />;
+  return (
+    <>
+      <BannerHero />
+      <Feed initialPosts={initialPosts} highlight={highlightPost} />
+    </>
+  );
 }

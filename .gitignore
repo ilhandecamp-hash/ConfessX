@@ -8,3 +8,7 @@ out
 *.log
 dist
 *.tsbuildinfo
+
+# Assets source — les versions servies sont dans public/
+/logo.png
+/bannière.png
