@@ -80,38 +80,33 @@ create trigger trg_posts_hot_score
 select public.recalc_hot_scores();
 
 -- 4) FONCTION add_comment v2 (supporte parent_id) ---------------------
+-- En pur SQL avec CTE pour éviter le bug SELECT INTO dans Supabase SQL Editor.
+-- Retourne l'id inséré, ou NULL si validation échoue (parent invalide / contenu hors bornes).
 create or replace function public.add_comment(
     p_post_id uuid,
     p_content text,
     p_author_token text,
     p_parent_id uuid default null
 ) returns uuid
-language plpgsql
+language sql
 security definer
 set search_path = public
 as $$
-declare
-    v_id uuid;
-    v_parent_post uuid;
-begin
-    if p_content is null or char_length(trim(p_content)) < 1 or char_length(p_content) > 500 then
-        raise exception 'invalid content';
-    end if;
-
-    -- Vérifie que le parent (si fourni) appartient au même post
-    if p_parent_id is not null then
-        select post_id into v_parent_post from public.comments where id = p_parent_id;
-        if v_parent_post is null or v_parent_post <> p_post_id then
-            raise exception 'invalid parent';
-        end if;
-    end if;
-
-    insert into public.comments (post_id, content, author_token, parent_id)
-    values (p_post_id, trim(p_content), p_author_token, p_parent_id)
-    returning id into v_id;
-
-    return v_id;
-end;
+    with inserted as (
+        insert into public.comments (post_id, content, author_token, parent_id)
+        select p_post_id, trim(p_content), p_author_token, p_parent_id
+        where p_content is not null
+          and char_length(trim(p_content)) between 1 and 500
+          and (
+              p_parent_id is null
+              or exists (
+                  select 1 from public.comments c
+                  where c.id = p_parent_id and c.post_id = p_post_id
+              )
+          )
+        returning id
+    )
+    select id from inserted;
 $$;
 
 grant execute on function public.add_comment(uuid, text, text, uuid) to anon, authenticated;
