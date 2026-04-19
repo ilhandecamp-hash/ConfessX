@@ -34,6 +34,7 @@ export type Database = {
           created_at: string;
           updated_at: string | null;
           author_token: string | null;
+          user_id: string | null;
         };
         Insert: {
           id?: string;
@@ -43,6 +44,7 @@ export type Database = {
           status?: PostStatus;
           nsfw?: boolean;
           author_token?: string | null;
+          user_id?: string | null;
           created_at?: string;
         };
         Update: {
@@ -106,6 +108,7 @@ export type Database = {
           parent_id: string | null;
           content: string;
           author_token: string | null;
+          user_id: string | null;
           status: PostStatus;
           funny_count: number;
           awkward_count: number;
@@ -119,6 +122,7 @@ export type Database = {
           parent_id?: string | null;
           content: string;
           author_token?: string | null;
+          user_id?: string | null;
           status?: PostStatus;
         };
         Update: {
@@ -128,6 +132,35 @@ export type Database = {
           awkward_count?: number;
           serious_count?: number;
           report_count?: number;
+          updated_at?: string | null;
+        };
+        Relationships: [];
+      };
+      profiles: {
+        Row: {
+          id: string;
+          username: string;
+          first_name: string;
+          last_name: string;
+          avatar_seed: string;
+          bio: string | null;
+          created_at: string;
+          updated_at: string | null;
+        };
+        Insert: {
+          id: string;
+          username: string;
+          first_name: string;
+          last_name: string;
+          avatar_seed?: string;
+          bio?: string | null;
+        };
+        Update: {
+          username?: string;
+          first_name?: string;
+          last_name?: string;
+          avatar_seed?: string;
+          bio?: string | null;
           updated_at?: string | null;
         };
         Relationships: [];
@@ -184,11 +217,16 @@ export type Database = {
         Returns: boolean;
       };
       delete_post: {
-        Args: { p_post_id: string; p_author_token: string };
+        Args: { p_post_id: string; p_author_token: string; p_user_id?: string | null };
         Returns: boolean;
       };
       update_post: {
-        Args: { p_post_id: string; p_author_token: string; p_content: string };
+        Args: {
+          p_post_id: string;
+          p_author_token: string;
+          p_content: string;
+          p_user_id?: string | null;
+        };
         Returns: boolean;
       };
       add_comment: {
@@ -197,8 +235,26 @@ export type Database = {
           p_content: string;
           p_author_token: string | null;
           p_parent_id?: string | null;
+          p_user_id?: string | null;
         };
         Returns: string;
+      };
+      create_profile: {
+        Args: { p_username: string; p_first_name: string; p_last_name: string };
+        Returns: void;
+      };
+      username_available: {
+        Args: { p_username: string };
+        Returns: boolean;
+      };
+      get_user_karma: {
+        Args: { p_user_id: string };
+        Returns: {
+          posts_count: number;
+          votes_received: number;
+          views_received: number;
+          comments_count: number;
+        }[];
       };
       get_karma: {
         Args: { p_author_token: string };
@@ -214,7 +270,7 @@ export type Database = {
         Returns: void;
       };
       delete_comment: {
-        Args: { p_comment_id: string; p_author_token: string };
+        Args: { p_comment_id: string; p_author_token: string; p_user_id?: string | null };
         Returns: boolean;
       };
       increment_comment_vote: {

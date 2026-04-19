@@ -12,7 +12,7 @@ import { ReportButton } from "./ReportButton";
 import { ShareButton } from "./ShareButton";
 import { BookmarkButton } from "./BookmarkButton";
 import { OwnerActions } from "./OwnerActions";
-import { Avatar } from "./Avatar";
+import { AuthorBadge } from "./AuthorBadge";
 import { NsfwGate } from "./NsfwGate";
 
 interface Props {
@@ -53,7 +53,7 @@ export function PostCard({ post: initial, highlight = false, linkToDetail = true
       {/* Header */}
       <header className="mb-3 flex items-center justify-between">
         <div className="flex items-center gap-2">
-          <Avatar seed={post.id} />
+          <AuthorBadge author={post.author} fallbackSeed={post.id} />
           <Link
             href={`/c/${post.category}`}
             className="flex items-center gap-1 rounded-full bg-bg-soft px-2 py-0.5 text-[11px] font-medium text-neutral-300 transition hover:bg-border"
@@ -84,7 +84,7 @@ export function PostCard({ post: initial, highlight = false, linkToDetail = true
         </span>
       </header>
 
-      {/* Content (avec gate NSFW si flag) */}
+      {/* Content */}
       {post.nsfw ? (
         <NsfwGate>
           {linkToDetail ? (
@@ -103,10 +103,8 @@ export function PostCard({ post: initial, highlight = false, linkToDetail = true
         body
       )}
 
-      {/* Voting */}
       {isJudgment ? <JudgmentBar post={post} /> : <VoteBar post={post} />}
 
-      {/* Footer */}
       <footer className="mt-3 flex flex-wrap items-center justify-between gap-2">
         <div className="flex items-center gap-3 text-[11px] text-neutral-600">
           <span className="flex items-center gap-1">

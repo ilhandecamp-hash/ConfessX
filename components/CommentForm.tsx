@@ -1,11 +1,12 @@
 "use client";
 
-import { Send, X } from "lucide-react";
+import { EyeOff, Send, UserRound, X } from "lucide-react";
 import { useState } from "react";
 import { getOrCreateDeviceToken } from "@/lib/device";
 import { MAX_COMMENT_LENGTH } from "@/types/post";
 import { moderate } from "@/lib/moderation";
 import { cn } from "@/lib/utils";
+import { useAuth } from "@/contexts/AuthContext";
 
 interface Props {
   postId: string;
@@ -22,11 +23,13 @@ export function CommentForm({
   parentId = null,
   autoFocus = false,
   onCancel,
-  placeholder = "Donne ton avis anonymement…",
+  placeholder = "Donne ton avis…",
 }: Props) {
+  const { profile } = useAuth();
   const [content, setContent] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [anonymous, setAnonymous] = useState(!profile);
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -46,7 +49,12 @@ export function CommentForm({
       const res = await fetch(`/api/posts/${postId}/comments`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ content: text, device_token: token, parent_id: parentId }),
+        body: JSON.stringify({
+          content: text,
+          device_token: token,
+          parent_id: parentId,
+          anonymous,
+        }),
       });
       const data = await res.json();
       if (!res.ok) {
@@ -73,15 +81,41 @@ export function CommentForm({
           autoFocus={autoFocus}
           className="w-full resize-none bg-transparent text-sm leading-relaxed placeholder-neutral-600 focus:outline-none"
         />
-        <div className="flex items-center justify-between pt-1">
-          <span
-            className={cn(
-              "text-[11px] tabular-nums",
-              remaining <= 40 ? "text-brand" : "text-neutral-600",
+        <div className="flex flex-wrap items-center justify-between gap-2 pt-1">
+          <div className="flex items-center gap-2">
+            <span
+              className={cn(
+                "text-[11px] tabular-nums",
+                remaining <= 40 ? "text-brand" : "text-neutral-600",
+              )}
+            >
+              {remaining}
+            </span>
+            {profile && (
+              <button
+                type="button"
+                onClick={() => setAnonymous((a) => !a)}
+                className={cn(
+                  "flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-semibold transition",
+                  anonymous
+                    ? "bg-bg-soft text-neutral-400"
+                    : "bg-brand/15 text-brand",
+                )}
+                title={anonymous ? "Cliquer pour poster en tant que toi" : "Cliquer pour poster anonymement"}
+              >
+                {anonymous ? (
+                  <>
+                    <EyeOff className="h-3 w-3" />
+                    Anonyme
+                  </>
+                ) : (
+                  <>
+                    <UserRound className="h-3 w-3" />@{profile.username}
+                  </>
+                )}
+              </button>
             )}
-          >
-            {remaining}
-          </span>
+          </div>
           <div className="flex items-center gap-2">
             {onCancel && (
               <button

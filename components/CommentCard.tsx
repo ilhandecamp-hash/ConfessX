@@ -7,7 +7,7 @@ import { formatRelative, cn, compactNumber } from "@/lib/utils";
 import { renderRichText } from "@/lib/markdown";
 import type { Comment, CommentVoteType } from "@/types/post";
 import { ReportButton } from "./ReportButton";
-import { Avatar } from "./Avatar";
+import { AuthorBadge } from "./AuthorBadge";
 import { CommentForm } from "./CommentForm";
 
 const STORAGE_KEY = "confessx_comment_votes";
@@ -95,10 +95,10 @@ export function CommentCard({ comment, postId, onDeleted, onReplyPosted, isReply
 
   return (
     <div className={cn("rounded-xl border border-border bg-bg-soft p-3", isReply && "bg-bg-card")}>
-      <div className="mb-2 flex items-center gap-2">
-        <Avatar seed={comment.id} />
+      <div className="mb-2 flex items-center justify-between gap-2">
+        <AuthorBadge author={comment.author} fallbackSeed={comment.id} />
         <span className="text-[11px] text-neutral-500">
-          Anonyme · {formatRelative(comment.created_at)}
+          {formatRelative(comment.created_at)}
           {comment.updated_at && " · modifié"}
         </span>
       </div>

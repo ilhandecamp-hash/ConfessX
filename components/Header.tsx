@@ -2,8 +2,9 @@
 
 import Link from "next/link";
 import Image from "next/image";
-import { Bookmark, Plus, User } from "lucide-react";
+import { Bookmark, Plus } from "lucide-react";
 import { SearchBar } from "./SearchBar";
+import { AuthMenu } from "./AuthMenu";
 
 export function Header() {
   return (
@@ -32,13 +33,7 @@ export function Header() {
           >
             <Bookmark className="h-4 w-4" />
           </Link>
-          <Link
-            href="/me"
-            className="grid h-9 w-9 place-items-center rounded-full text-neutral-400 transition hover:bg-bg-soft hover:text-neutral-100"
-            aria-label="Profil"
-          >
-            <User className="h-4 w-4" />
-          </Link>
+          <AuthMenu />
           <Link
             href="/new"
             className="flex items-center gap-1 rounded-full bg-brand px-3 py-1.5 text-xs font-bold text-white shadow-lg shadow-brand/20 transition hover:bg-brand-hover active:scale-95"

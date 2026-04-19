@@ -24,6 +24,8 @@ export interface Post {
   trending_score: number;
   hot_score: number;
   nsfw: boolean;
+  user_id: string | null;
+  author?: Profile | null; // joint côté API
   created_at: string;
   updated_at: string | null;
 }
@@ -38,8 +40,20 @@ export interface Comment {
   awkward_count: number;
   serious_count: number;
   report_count: number;
+  user_id: string | null;
+  author?: Profile | null; // joint côté API
   created_at: string;
   updated_at: string | null;
+}
+
+export interface Profile {
+  id: string;
+  username: string;
+  first_name: string;
+  last_name: string;
+  avatar_seed: string;
+  bio: string | null;
+  created_at: string;
 }
 
 export interface Karma {

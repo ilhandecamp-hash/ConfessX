@@ -1,6 +1,6 @@
 "use client";
 
-import { EyeOff, Scale, Send } from "lucide-react";
+import { EyeOff, Scale, Send, UserRound } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { CategoryPicker } from "./CategoryPicker";
@@ -9,14 +9,17 @@ import { moderate } from "@/lib/moderation";
 import { getOrCreateDeviceToken } from "@/lib/device";
 import { cn } from "@/lib/utils";
 import { useOwnership } from "@/contexts/OwnershipContext";
+import { useAuth } from "@/contexts/AuthContext";
 
 export function NewPostForm() {
   const router = useRouter();
   const { markOwned } = useOwnership();
+  const { profile } = useAuth();
   const [content, setContent] = useState("");
   const [category, setCategory] = useState<Category | null>(null);
   const [judgment, setJudgment] = useState(false);
   const [nsfw, setNsfw] = useState(false);
+  const [anonymous, setAnonymous] = useState(!profile); // défaut : si pas connecté → anonymous
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -46,6 +49,7 @@ export function NewPostForm() {
           category,
           mode,
           nsfw,
+          anonymous,
           device_token,
         }),
       });
@@ -87,6 +91,42 @@ export function NewPostForm() {
         </div>
       </div>
 
+      {/* Qui poste ? (si connecté) */}
+      {profile && (
+        <div className="space-y-2">
+          <label className="block text-xs font-semibold uppercase tracking-wider text-neutral-400">
+            Publier en tant que
+          </label>
+          <div className="grid grid-cols-2 gap-2">
+            <button
+              type="button"
+              onClick={() => setAnonymous(false)}
+              className={cn(
+                "flex flex-col items-center gap-1 rounded-xl border border-border bg-bg-soft py-3 transition",
+                !anonymous ? "border-brand bg-brand/15 text-brand" : "text-neutral-300 hover:border-border-strong",
+              )}
+            >
+              <UserRound className="h-4 w-4" />
+              <span className="text-xs font-semibold">@{profile.username}</span>
+              <span className="text-[10px] text-neutral-500">Visible pour tous</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => setAnonymous(true)}
+              className={cn(
+                "flex flex-col items-center gap-1 rounded-xl border border-border bg-bg-soft py-3 transition",
+                anonymous ? "border-brand bg-brand/15 text-brand" : "text-neutral-300 hover:border-border-strong",
+              )}
+            >
+              <EyeOff className="h-4 w-4" />
+              <span className="text-xs font-semibold">Anonyme</span>
+              <span className="text-[10px] text-neutral-500">Rien ne te relie au post</span>
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Catégorie */}
       <div className="space-y-2">
         <label className="block text-xs font-semibold uppercase tracking-wider text-neutral-400">
           Catégorie
@@ -94,6 +134,7 @@ export function NewPostForm() {
         <CategoryPicker value={category} onChange={setCategory} />
       </div>
 
+      {/* Options */}
       <div className="space-y-2">
         <label
           className={cn(
@@ -157,12 +198,18 @@ export function NewPostForm() {
         )}
       >
         <Send className="h-4 w-4" />
-        {submitting ? "Envoi…" : "Publier anonymement"}
+        {submitting
+          ? "Envoi…"
+          : anonymous || !profile
+            ? "Publier anonymement"
+            : `Publier en tant que @${profile.username}`}
       </button>
 
-      <p className="text-center text-[11px] text-neutral-600">
-        Un identifiant anonyme est stocké dans ton navigateur pour te laisser éditer / supprimer tes posts.
-      </p>
+      {(anonymous || !profile) && (
+        <p className="text-center text-[11px] text-neutral-600">
+          Un identifiant anonyme est stocké dans ton navigateur pour te laisser éditer / supprimer tes posts.
+        </p>
+      )}
     </form>
   );
 }

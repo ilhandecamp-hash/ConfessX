@@ -1,5 +1,9 @@
 import { NextResponse } from "next/server";
-import { createServiceClient, createAnonServerClient } from "@/lib/supabase/server";
+import {
+  createServiceClient,
+  createAnonServerClient,
+  createServerSupabase,
+} from "@/lib/supabase/server";
 import { hashAuthorToken } from "@/lib/author";
 import { getFingerprint } from "@/lib/fingerprint";
 import { rateLimit } from "@/lib/rate-limit";
@@ -10,12 +14,11 @@ export const dynamic = "force-dynamic";
 
 interface Params { params: { id: string } }
 
-// GET /api/posts/:id — fetch single post (public)
 export async function GET(_req: Request, { params }: Params) {
   const supabase = createAnonServerClient();
   const { data, error } = await supabase
     .from("posts")
-    .select("*")
+    .select("*, author:profiles(id,username,first_name,last_name,avatar_seed,bio,created_at)")
     .eq("id", params.id)
     .eq("status", "published")
     .maybeSingle();
@@ -24,7 +27,6 @@ export async function GET(_req: Request, { params }: Params) {
   return NextResponse.json({ post: data });
 }
 
-// DELETE /api/posts/:id — auteur uniquement (via device_token)
 export async function DELETE(req: Request, { params }: Params) {
   const fingerprint = getFingerprint(req);
   const rl = rateLimit(`delete:${fingerprint}`, 20, 60_000);
@@ -32,19 +34,28 @@ export async function DELETE(req: Request, { params }: Params) {
 
   const token = req.headers.get("x-device-token") || "";
   const author = hashAuthorToken(token);
-  if (!author) return NextResponse.json({ error: "Missing device token." }, { status: 401 });
+
+  const authClient = createServerSupabase();
+  const {
+    data: { user },
+  } = await authClient.auth.getUser();
+  const userId = user?.id ?? null;
+
+  if (!author && !userId) {
+    return NextResponse.json({ error: "Non autorisé." }, { status: 401 });
+  }
 
   const supabase = createServiceClient();
   const { data, error } = await supabase.rpc("delete_post", {
     p_post_id: params.id,
-    p_author_token: author,
+    p_author_token: author || "",
+    p_user_id: userId,
   });
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
   if (!data) return NextResponse.json({ error: "Non autorisé." }, { status: 403 });
   return NextResponse.json({ ok: true });
 }
 
-// PATCH /api/posts/:id — édition auteur dans les 5 min
 export async function PATCH(req: Request, { params }: Params) {
   const fingerprint = getFingerprint(req);
   const rl = rateLimit(`edit:${fingerprint}`, 10, 60_000);
@@ -52,7 +63,16 @@ export async function PATCH(req: Request, { params }: Params) {
 
   const token = req.headers.get("x-device-token") || "";
   const author = hashAuthorToken(token);
-  if (!author) return NextResponse.json({ error: "Missing device token." }, { status: 401 });
+
+  const authClient = createServerSupabase();
+  const {
+    data: { user },
+  } = await authClient.auth.getUser();
+  const userId = user?.id ?? null;
+
+  if (!author && !userId) {
+    return NextResponse.json({ error: "Non autorisé." }, { status: 401 });
+  }
 
   let body: { content?: unknown };
   try {
@@ -67,13 +87,14 @@ export async function PATCH(req: Request, { params }: Params) {
   const supabase = createServiceClient();
   const { data, error } = await supabase.rpc("update_post", {
     p_post_id: params.id,
-    p_author_token: author,
+    p_author_token: author || "",
     p_content: content,
+    p_user_id: userId,
   });
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
   if (!data) {
     return NextResponse.json(
-      { error: "Édition impossible (auteur invalide ou fenêtre de 5 min expirée)." },
+      { error: "Édition impossible (non auteur ou fenêtre de 5 min expirée)." },
       { status: 403 },
     );
   }

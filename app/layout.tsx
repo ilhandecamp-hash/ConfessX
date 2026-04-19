@@ -3,6 +3,9 @@ import { Inter } from "next/font/google";
 import { Header } from "@/components/Header";
 import { ScrollToTop } from "@/components/ScrollToTop";
 import { OwnershipProvider } from "@/contexts/OwnershipContext";
+import { AuthProvider } from "@/contexts/AuthContext";
+import { getCurrentUser } from "@/lib/supabase/server";
+import type { Profile } from "@/types/post";
 import "./globals.css";
 
 const inter = Inter({
@@ -44,15 +47,21 @@ export const viewport: Viewport = {
   userScalable: false,
 };
 
-export default function RootLayout({ children }: { children: React.ReactNode }) {
+export default async function RootLayout({ children }: { children: React.ReactNode }) {
+  const auth = await getCurrentUser();
+  const initialUserId = auth?.user?.id ?? null;
+  const initialProfile = (auth?.profile as Profile | null) ?? null;
+
   return (
     <html lang="fr" className={`dark ${inter.variable}`}>
       <body className="min-h-screen bg-bg text-neutral-100">
-        <OwnershipProvider>
-          <Header />
-          <main className="mx-auto w-full max-w-xl px-4 py-4 pb-20">{children}</main>
-          <ScrollToTop />
-        </OwnershipProvider>
+        <AuthProvider initialUserId={initialUserId} initialProfile={initialProfile}>
+          <OwnershipProvider>
+            <Header />
+            <main className="mx-auto w-full max-w-xl px-4 py-4 pb-20">{children}</main>
+            <ScrollToTop />
+          </OwnershipProvider>
+        </AuthProvider>
       </body>
     </html>
   );
