@@ -2,7 +2,8 @@ import { Feed } from "@/components/Feed";
 import { createAnonServerClient } from "@/lib/supabase/server";
 import type { Post } from "@/types/post";
 
-export const revalidate = 30; // ISR — le feed initial est régénéré toutes les 30s
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
 
 export default async function HomePage() {
   const supabase = createAnonServerClient();

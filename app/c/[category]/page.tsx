@@ -5,7 +5,8 @@ import { Feed } from "@/components/Feed";
 import { CATEGORIES, type Category, type Post } from "@/types/post";
 import { createAnonServerClient } from "@/lib/supabase/server";
 
-export const revalidate = 30;
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
 
 const VALID: Category[] = ["ecole", "amour", "famille", "argent"];
 

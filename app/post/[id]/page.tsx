@@ -7,7 +7,8 @@ import { ViewTracker } from "@/components/ViewTracker";
 import { createAnonServerClient } from "@/lib/supabase/server";
 import type { Post } from "@/types/post";
 
-export const revalidate = 60;
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
 
 interface Props {
   params: { id: string };
