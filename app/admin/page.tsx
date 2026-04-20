@@ -447,7 +447,7 @@ function UsersSection({ secret }: { secret: string }) {
     );
     if (typed !== prefix) return;
 
-    // Optimistic: retire immédiatement de l'UI.
+    // Optimistic: retire immédiatement.
     setUsers((prev) => prev.filter((x) => x.id !== u.id));
 
     try {
@@ -460,10 +460,11 @@ function UsersSection({ secret }: { secret: string }) {
       } else {
         const { error } = await res.json().catch(() => ({ error: "Erreur inconnue." }));
         alert("Erreur : " + error);
-        await refresh();
       }
     } catch {
       alert("Erreur réseau.");
+    } finally {
+      // Toujours re-sync avec le serveur, succès comme échec
       await refresh();
     }
   }

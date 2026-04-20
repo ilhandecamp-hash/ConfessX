@@ -21,7 +21,10 @@ function dismiss(id: string) {
   try {
     const arr = readDismissed();
     if (!arr.includes(id)) arr.push(id);
-    localStorage.setItem(DISMISSED_KEY, JSON.stringify(arr.slice(-100)));
+    const val = JSON.stringify(arr.slice(-100));
+    localStorage.setItem(DISMISSED_KEY, val);
+    // Notifie les autres composants (NotificationsBell)
+    window.dispatchEvent(new StorageEvent("storage", { key: DISMISSED_KEY, newValue: val }));
   } catch {
     /* ignore */
   }

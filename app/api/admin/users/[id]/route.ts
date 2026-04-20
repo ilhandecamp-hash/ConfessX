@@ -7,36 +7,56 @@ export const dynamic = "force-dynamic";
 
 interface Params { params: { id: string } }
 
-// DELETE /api/admin/users/:id?purge=1 — robuste : ne fail jamais si le user a déjà été partiellement supprimé.
+function isAlreadyGoneError(msg: string): boolean {
+  const lower = msg.toLowerCase();
+  return (
+    lower.includes("not found") ||
+    lower.includes("does not exist") ||
+    lower.includes("user_not_found") ||
+    lower.includes("no rows")
+  );
+}
+
+// DELETE /api/admin/users/:id?purge=1
+// Stratégie :
+//   1. (purge) supprimer posts + comments de ce user
+//   2. Supprimer explicitement le profile (géré par service_role, bypass RLS)
+//   3. Supprimer auth.users (cascade sur profile déjà vidé = no-op)
+//   4. Collecter erreurs non-triviales, renvoyer succès si user effectivement parti
 export async function DELETE(req: Request, { params }: Params) {
   if (!checkAdminSecret(req.headers.get("x-admin-secret"))) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
   const url = new URL(req.url);
   const purge = url.searchParams.get("purge") === "1";
-
   const supabase = createServiceClient();
+  const id = params.id;
+
+  const fatal: string[] = [];
 
   if (purge) {
-    // On purge posts & comments de ce user avant.
-    await supabase.from("posts").delete().eq("user_id", params.id);
-    await supabase.from("comments").delete().eq("user_id", params.id);
+    const postsDel = await supabase.from("posts").delete().eq("user_id", id);
+    if (postsDel.error) fatal.push(`posts: ${postsDel.error.message}`);
+
+    const commentsDel = await supabase.from("comments").delete().eq("user_id", id);
+    if (commentsDel.error) fatal.push(`comments: ${commentsDel.error.message}`);
   }
 
-  // Supprime le profile (cascade pour follows/blocks/hidden/notifications).
-  await supabase.from("profiles").delete().eq("id", params.id);
+  // Supprimer le profile (idempotent)
+  const profileDel = await supabase.from("profiles").delete().eq("id", id);
+  if (profileDel.error) fatal.push(`profile: ${profileDel.error.message}`);
 
-  // Supprime l'user Supabase Auth — ignore si déjà parti.
-  const { error } = await supabase.auth.admin.deleteUser(params.id);
-  if (error) {
-    const msg = error.message.toLowerCase();
-    const alreadyGone =
-      msg.includes("not found") ||
-      msg.includes("does not exist") ||
-      msg.includes("user_not_found");
-    if (!alreadyGone) {
-      return NextResponse.json({ error: error.message }, { status: 500 });
-    }
+  // Supprimer l'utilisateur Auth
+  const { error: authErr } = await supabase.auth.admin.deleteUser(id);
+  if (authErr && !isAlreadyGoneError(authErr.message)) {
+    fatal.push(`auth: ${authErr.message}`);
+  }
+
+  if (fatal.length > 0) {
+    return NextResponse.json(
+      { error: fatal.join(" | "), purged: purge },
+      { status: 500 },
+    );
   }
 
   return NextResponse.json({ ok: true, purged: purge });
