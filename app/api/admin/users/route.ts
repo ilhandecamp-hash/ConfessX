@@ -37,5 +37,7 @@ export async function GET(req: Request) {
     }),
   );
 
-  return NextResponse.json({ users: withStats });
+  const res = NextResponse.json({ users: withStats });
+  res.headers.set("Cache-Control", "no-store, max-age=0");
+  return res;
 }

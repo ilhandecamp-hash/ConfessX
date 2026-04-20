@@ -19,11 +19,11 @@ function isAlreadyGoneError(msg: string): boolean {
 
 // DELETE /api/admin/users/:id?purge=1
 //
-// Stratégie robuste avec diagnostics :
-// 1. (purge) Delete posts + comments du user
-// 2. Delete auth.users → cascade FK supprime profile si encore là
-// 3. Delete profile explicitement (au cas où auth.deleteUser a soft-deleted)
-// 4. Vérifier que le profile a bien disparu → sinon retourne 500 avec debug
+// Séquence atomique garantie :
+//   1. RPC admin_force_delete_user (SECURITY DEFINER, bypass RLS) → supprime
+//      profile + éventuellement posts/comments, retourne compteurs exacts.
+//   2. auth.admin.deleteUser → retire la row dans auth.users (+ sessions).
+//   3. Vérification SELECT : le profile doit être absent après.
 export async function DELETE(req: Request, { params }: Params) {
   if (!checkAdminSecret(req.headers.get("x-admin-secret"))) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -35,27 +35,35 @@ export async function DELETE(req: Request, { params }: Params) {
 
   const debug: Record<string, unknown> = { id, purge };
 
-  if (purge) {
-    const r = await supabase.from("posts").delete().eq("user_id", id).select("id");
-    debug.posts_deleted = r.data?.length ?? 0;
-    if (r.error) debug.posts_error = r.error.message;
-
-    const r2 = await supabase.from("comments").delete().eq("user_id", id).select("id");
-    debug.comments_deleted = r2.data?.length ?? 0;
-    if (r2.error) debug.comments_error = r2.error.message;
+  // 1) RPC atomique (SECURITY DEFINER)
+  const rpcRes = await supabase.rpc("admin_force_delete_user", {
+    p_user_id: id,
+    p_purge: purge,
+  } as never);
+  if (rpcRes.error) {
+    debug.rpc_error = rpcRes.error.message;
+    // Fallback : delete direct via service role
+    if (purge) {
+      const p = await supabase.from("posts").delete().eq("user_id", id).select("id");
+      debug.posts_deleted_fallback = p.data?.length ?? 0;
+      if (p.error) debug.posts_error = p.error.message;
+      const c = await supabase.from("comments").delete().eq("user_id", id).select("id");
+      debug.comments_deleted_fallback = c.data?.length ?? 0;
+      if (c.error) debug.comments_error = c.error.message;
+    }
+    const prof = await supabase.from("profiles").delete().eq("id", id).select("id");
+    debug.profile_deleted_fallback = prof.data?.length ?? 0;
+    if (prof.error) debug.profile_error = prof.error.message;
+  } else {
+    debug.rpc_result = rpcRes.data;
   }
 
-  // 1) Delete auth user
+  // 2) Delete auth user
   const authRes = await supabase.auth.admin.deleteUser(id);
   debug.auth_error = authRes.error?.message ?? null;
   const authGone = !authRes.error || isAlreadyGoneError(authRes.error.message);
 
-  // 2) Delete profile (au cas où Auth soft-delete ne cascade pas)
-  const profileRes = await supabase.from("profiles").delete().eq("id", id).select("id");
-  debug.profile_deleted = profileRes.data?.length ?? 0;
-  if (profileRes.error) debug.profile_error = profileRes.error.message;
-
-  // 3) Vérif finale
+  // 3) Vérif finale (avec cache-busting via pas de cache Supabase)
   const verify = await supabase.from("profiles").select("id").eq("id", id).maybeSingle();
   debug.profile_still_exists = !!verify.data;
 
@@ -65,8 +73,7 @@ export async function DELETE(req: Request, { params }: Params) {
     return NextResponse.json(
       {
         error:
-          "Le profile persiste en base malgré la suppression. " +
-          "Vérifie que SUPABASE_SERVICE_ROLE_KEY sur Vercel est bien la clé 'service_role' (pas le publishable/anon).",
+          "Le profile persiste malgré la suppression. La RPC 'admin_force_delete_user' existe-t-elle ? As-tu exécuté migration_v7.sql ? Sinon vérifie SUPABASE_SERVICE_ROLE_KEY sur Vercel.",
         debug,
       },
       { status: 500 },
@@ -75,15 +82,20 @@ export async function DELETE(req: Request, { params }: Params) {
 
   if (!authGone && authRes.error) {
     return NextResponse.json(
-      { error: `Auth delete failed: ${authRes.error.message}`, debug },
+      {
+        error: `Profile supprimé mais delete auth.users a échoué : ${authRes.error.message}`,
+        debug,
+      },
       { status: 500 },
     );
   }
 
-  return NextResponse.json({ ok: true, purged: purge, debug });
+  const res = NextResponse.json({ ok: true, purged: purge, debug });
+  res.headers.set("Cache-Control", "no-store");
+  return res;
 }
 
-// PATCH /api/admin/users/:id  { action: 'ban'|'unban'|'reset_password', reason?, new_password? }
+// PATCH /api/admin/users/:id  { action: 'ban'|'unban'|'reset_password' }
 export async function PATCH(req: Request, { params }: Params) {
   if (!checkAdminSecret(req.headers.get("x-admin-secret"))) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
