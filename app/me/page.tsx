@@ -6,6 +6,7 @@ import {
   Eye,
   LogIn,
   MessageCircle,
+  Pencil,
   RefreshCw,
   ThumbsUp,
   UserPlus,
@@ -15,6 +16,7 @@ import { useEffect, useState } from "react";
 import { PostCard } from "@/components/PostCard";
 import { FeedSkeleton } from "@/components/Skeleton";
 import { Avatar } from "@/components/Avatar";
+import { Badge } from "@/components/Badge";
 import { getOrCreateDeviceToken, resetDeviceToken } from "@/lib/device";
 import { compactNumber } from "@/lib/utils";
 import { useOwnership } from "@/contexts/OwnershipContext";
@@ -77,20 +79,32 @@ export default function MePage() {
 
       {/* Account card */}
       {profile ? (
-        <div className="flex items-center gap-3 rounded-2xl border border-border bg-bg-card p-4">
-          <Avatar seed={profile.avatar_seed} size="lg" />
-          <div className="min-w-0 flex-1">
-            <p className="truncate text-base font-bold">
-              {profile.first_name} {profile.last_name}
-            </p>
-            <p className="truncate text-xs text-neutral-500">@{profile.username}</p>
+        <div className="space-y-3 rounded-2xl border border-border bg-bg-card p-4">
+          <div className="flex items-start gap-3">
+            <Avatar seed={profile.avatar_seed} size="lg" />
+            <div className="min-w-0 flex-1 space-y-1">
+              <p className="truncate text-base font-bold">
+                {profile.first_name} {profile.last_name}
+              </p>
+              <p className="truncate text-xs text-neutral-500">@{profile.username}</p>
+              {profile.bio && <p className="text-xs text-neutral-400">{profile.bio}</p>}
+            </div>
+            <div className="flex flex-col gap-1">
+              <Link
+                href="/me/edit"
+                className="flex items-center gap-1 rounded-full border border-border px-2 py-1 text-[11px] text-neutral-400 hover:border-border-strong"
+              >
+                <Pencil className="h-3 w-3" />
+                Éditer
+              </Link>
+              <button
+                onClick={signOut}
+                className="rounded-full border border-border px-2 py-1 text-[11px] text-neutral-400 hover:text-red-400"
+              >
+                Logout
+              </button>
+            </div>
           </div>
-          <button
-            onClick={signOut}
-            className="rounded-full border border-border px-3 py-1 text-[11px] text-neutral-400 hover:text-red-400"
-          >
-            Logout
-          </button>
         </div>
       ) : (
         <div className="space-y-3 rounded-2xl border border-dashed border-border bg-bg-card p-4">
@@ -120,15 +134,18 @@ export default function MePage() {
         </div>
       )}
 
-      {/* Karma */}
+      {/* Karma + badge */}
       <div className="overflow-hidden rounded-2xl border border-brand/30 bg-gradient-to-br from-brand/20 via-bg-card to-bg-card p-5">
         <div className="flex items-center justify-between">
-          <div>
+          <div className="flex-1">
             <p className="text-[10px] font-semibold uppercase tracking-wider text-brand">Karma</p>
             <p className="mt-1 text-3xl font-extrabold tabular-nums text-neutral-100">
               {compactNumber(karmaScore)}
             </p>
-            <p className="mt-0.5 text-[11px] text-neutral-500">
+            <div className="mt-2">
+              <Badge karma={karmaScore} showProgress />
+            </div>
+            <p className="mt-1 text-[11px] text-neutral-500">
               {accountCount > 0 && anonCount > 0
                 ? `Cumulé : ${accountCount} compte · ${anonCount} anonymes`
                 : profile

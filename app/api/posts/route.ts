@@ -10,23 +10,52 @@ import { hashAuthorToken } from "@/lib/author";
 import { rateLimit } from "@/lib/rate-limit";
 import type { Category, PostMode, Post, TimeRange } from "@/types/post";
 
+async function getFilters(): Promise<{
+  blockedIds: Set<string>;
+  hiddenPosts: Set<string>;
+  followingIds: Set<string>;
+}> {
+  const supabase = createServerSupabase();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) {
+    return { blockedIds: new Set(), hiddenPosts: new Set(), followingIds: new Set() };
+  }
+  const [blocksRes, hiddenRes, followsRes] = await Promise.all([
+    supabase.from("blocks").select("blocked_id").eq("blocker_id", user.id),
+    supabase.from("hidden_posts").select("post_id").eq("user_id", user.id),
+    supabase.from("follows").select("followed_id").eq("follower_id", user.id),
+  ]);
+  const blocks = (blocksRes.data ?? []) as Array<{ blocked_id: string }>;
+  const hidden = (hiddenRes.data ?? []) as Array<{ post_id: string }>;
+  const follows = (followsRes.data ?? []) as Array<{ followed_id: string }>;
+  return {
+    blockedIds: new Set(blocks.map((b) => b.blocked_id)),
+    hiddenPosts: new Set(hidden.map((h) => h.post_id)),
+    followingIds: new Set(follows.map((f) => f.followed_id)),
+  };
+}
+
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 // ---------- GET /api/posts ----------
 export async function GET(req: Request) {
   const url = new URL(req.url);
-  const tab = (url.searchParams.get("tab") || "trending") as "trending" | "recent";
+  const tab = (url.searchParams.get("tab") || "trending") as "trending" | "recent" | "following";
   const range = (url.searchParams.get("range") || "all") as TimeRange;
   const category = url.searchParams.get("category") as Category | null;
   const idsParam = url.searchParams.get("ids");
   const userIdParam = url.searchParams.get("user_id");
   const page = Math.max(1, parseInt(url.searchParams.get("page") || "1", 10));
   const limit = Math.min(50, Math.max(1, parseInt(url.searchParams.get("limit") || "15", 10)));
-  const from = (page - 1) * limit;
-  const to = from + limit - 1;
+  const offset = (page - 1) * limit;
+
+  // We fetch a bit more than limit to allow post-filter without losing items
+  const fetchLimit = Math.min(100, limit * 3);
 
   const supabase = createAnonServerClient();
+  const { blockedIds, hiddenPosts, followingIds } = await getFilters();
+
   let query = supabase
     .from("posts")
     .select("*, author:profiles(id,username,first_name,last_name,avatar_seed,bio,created_at)")
@@ -41,13 +70,17 @@ export async function GET(req: Request) {
   if (category && ["ecole", "amour", "famille", "argent"].includes(category)) {
     query = query.eq("category", category);
   }
+  if (tab === "following") {
+    if (followingIds.size === 0) return NextResponse.json({ posts: [] });
+    query = query.in("user_id", Array.from(followingIds));
+  }
   if (range !== "all") {
     const hours = range === "day" ? 24 : 24 * 7;
     const cutoff = new Date(Date.now() - hours * 3600 * 1000).toISOString();
     query = query.gte("created_at", cutoff);
   }
 
-  query = query.range(from, to);
+  query = query.range(offset, offset + fetchLimit - 1);
 
   if (tab === "trending") {
     query = query
@@ -59,7 +92,14 @@ export async function GET(req: Request) {
 
   const { data, error } = await query;
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
-  return NextResponse.json({ posts: (data ?? []) as unknown as Post[] });
+
+  // Post-filter: remove blocked users + hidden posts
+  const filtered = (data ?? [])
+    .filter((p) => !p.user_id || !blockedIds.has(p.user_id))
+    .filter((p) => !hiddenPosts.has(p.id))
+    .slice(0, limit);
+
+  return NextResponse.json({ posts: filtered as unknown as Post[] });
 }
 
 // ---------- POST /api/posts ----------

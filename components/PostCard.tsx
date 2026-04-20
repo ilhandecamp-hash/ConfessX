@@ -14,6 +14,7 @@ import { BookmarkButton } from "./BookmarkButton";
 import { OwnerActions } from "./OwnerActions";
 import { AuthorBadge } from "./AuthorBadge";
 import { NsfwGate } from "./NsfwGate";
+import { PostMenu } from "./PostMenu";
 
 interface Props {
   post: Post;
@@ -24,6 +25,7 @@ interface Props {
 export function PostCard({ post: initial, highlight = false, linkToDetail = true }: Props) {
   const [post, setPost] = useState<Post>(initial);
   const [deleted, setDeleted] = useState(false);
+  const [hidden, setHidden] = useState(false);
 
   const cat = CATEGORIES.find((c) => c.id === post.category);
   const isJudgment = post.mode === "judgment";
@@ -32,6 +34,17 @@ export function PostCard({ post: initial, highlight = false, linkToDetail = true
     return (
       <div className="rounded-2xl border border-dashed border-border bg-bg-card p-4 text-center text-xs text-neutral-500">
         Post supprimé.
+      </div>
+    );
+  }
+
+  if (hidden) {
+    return (
+      <div className="rounded-2xl border border-dashed border-border bg-bg-card p-3 text-center text-xs text-neutral-500">
+        Post masqué.{" "}
+        <button onClick={() => setHidden(false)} className="underline hover:text-neutral-300">
+          Rétablir
+        </button>
       </div>
     );
   }
@@ -130,6 +143,7 @@ export function PostCard({ post: initial, highlight = false, linkToDetail = true
           <BookmarkButton postId={post.id} />
           <ShareButton postId={post.id} />
           <ReportButton postId={post.id} />
+          <PostMenu postId={post.id} onHidden={() => setHidden(true)} />
         </div>
       </footer>
     </article>

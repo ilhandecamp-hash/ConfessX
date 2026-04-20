@@ -144,6 +144,9 @@ export type Database = {
           last_name: string;
           avatar_seed: string;
           bio: string | null;
+          banned: boolean;
+          banned_reason: string | null;
+          banned_at: string | null;
           created_at: string;
           updated_at: string | null;
         };
@@ -161,8 +164,62 @@ export type Database = {
           last_name?: string;
           avatar_seed?: string;
           bio?: string | null;
+          banned?: boolean;
+          banned_reason?: string | null;
+          banned_at?: string | null;
           updated_at?: string | null;
         };
+        Relationships: [];
+      };
+      follows: {
+        Row: {
+          follower_id: string;
+          followed_id: string;
+          created_at: string;
+        };
+        Insert: { follower_id: string; followed_id: string };
+        Update: { [_ in never]: never };
+        Relationships: [];
+      };
+      blocks: {
+        Row: {
+          blocker_id: string;
+          blocked_id: string;
+          created_at: string;
+        };
+        Insert: { blocker_id: string; blocked_id: string };
+        Update: { [_ in never]: never };
+        Relationships: [];
+      };
+      hidden_posts: {
+        Row: {
+          user_id: string;
+          post_id: string;
+          created_at: string;
+        };
+        Insert: { user_id: string; post_id: string };
+        Update: { [_ in never]: never };
+        Relationships: [];
+      };
+      notifications: {
+        Row: {
+          id: string;
+          user_id: string;
+          type: "comment" | "reply" | "follow" | "mention";
+          actor_id: string | null;
+          post_id: string | null;
+          comment_id: string | null;
+          read_at: string | null;
+          created_at: string;
+        };
+        Insert: {
+          user_id: string;
+          type: "comment" | "reply" | "follow" | "mention";
+          actor_id?: string | null;
+          post_id?: string | null;
+          comment_id?: string | null;
+        };
+        Update: { read_at?: string | null };
         Relationships: [];
       };
       comment_votes: {
@@ -254,6 +311,23 @@ export type Database = {
           votes_received: number;
           views_received: number;
           comments_count: number;
+        }[];
+      };
+      mark_all_notifications_read: { Args: Record<string, never>; Returns: void };
+      count_unread_notifications: { Args: Record<string, never>; Returns: number };
+      list_notifications: {
+        Args: { p_limit?: number };
+        Returns: {
+          id: string;
+          type: "comment" | "reply" | "follow" | "mention";
+          post_id: string | null;
+          comment_id: string | null;
+          read_at: string | null;
+          created_at: string;
+          actor_username: string | null;
+          actor_avatar_seed: string | null;
+          post_excerpt: string | null;
+          comment_excerpt: string | null;
         }[];
       };
       get_karma: {

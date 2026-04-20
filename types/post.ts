@@ -3,7 +3,7 @@ export type PostMode = "confession" | "judgment";
 export type PostStatus = "pending" | "published" | "rejected";
 export type VoteType = "funny" | "awkward" | "serious" | "yes" | "no";
 export type CommentVoteType = "funny" | "awkward" | "serious";
-export type FeedTab = "trending" | "recent";
+export type FeedTab = "trending" | "recent" | "following";
 export type TimeRange = "day" | "week" | "all";
 export type ReportReason = "spam" | "hate" | "sexual" | "illegal" | "harassment" | "other";
 
@@ -53,7 +53,25 @@ export interface Profile {
   last_name: string;
   avatar_seed: string;
   bio: string | null;
+  banned?: boolean;
+  banned_reason?: string | null;
+  banned_at?: string | null;
   created_at: string;
+}
+
+export type NotificationType = "comment" | "reply" | "follow" | "mention";
+
+export interface NotificationItem {
+  id: string;
+  type: NotificationType;
+  post_id: string | null;
+  comment_id: string | null;
+  read_at: string | null;
+  created_at: string;
+  actor_username: string | null;
+  actor_avatar_seed: string | null;
+  post_excerpt: string | null;
+  comment_excerpt: string | null;
 }
 
 export interface Karma {

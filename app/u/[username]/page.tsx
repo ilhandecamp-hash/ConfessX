@@ -3,6 +3,8 @@ import { ArrowLeft, Eye, MessageCircle, ThumbsUp } from "lucide-react";
 import { notFound } from "next/navigation";
 import { PostCard } from "@/components/PostCard";
 import { Avatar } from "@/components/Avatar";
+import { Badge } from "@/components/Badge";
+import { FollowButton, BlockButton } from "@/components/FollowButton";
 import { createAnonServerClient } from "@/lib/supabase/server";
 import { compactNumber } from "@/lib/utils";
 import type { Post, Profile } from "@/types/post";
@@ -16,7 +18,7 @@ interface Props {
 export async function generateMetadata({ params }: Props) {
   return {
     title: `@${params.username} — ConfessX`,
-    description: `Profil public de @${params.username} sur ConfessX`,
+    description: `Profil public de @${params.username}`,
   };
 }
 
@@ -30,6 +32,12 @@ export default async function UserProfilePage({ params }: Props) {
 
   if (!profile) notFound();
   const p = profile as Profile;
+
+  // Count followers/following
+  const [{ count: followersCount }, { count: followingCount }] = await Promise.all([
+    supabase.from("follows").select("*", { count: "exact", head: true }).eq("followed_id", p.id),
+    supabase.from("follows").select("*", { count: "exact", head: true }).eq("follower_id", p.id),
+  ]);
 
   const { data: posts } = await supabase
     .from("posts")
@@ -59,19 +67,38 @@ export default async function UserProfilePage({ params }: Props) {
         Retour
       </Link>
 
-      <header className="flex items-center gap-4 rounded-2xl border border-border bg-bg-card p-4">
-        <Avatar seed={p.avatar_seed} size="lg" />
-        <div className="min-w-0 flex-1">
-          <p className="truncate text-lg font-bold">
-            {p.first_name} {p.last_name}
-          </p>
-          <p className="truncate text-xs text-neutral-500">@{p.username}</p>
-          {p.bio && <p className="mt-1 text-sm text-neutral-300">{p.bio}</p>}
+      <header className="space-y-3 rounded-2xl border border-border bg-bg-card p-4">
+        {p.banned && (
+          <div className="rounded-xl border border-red-500/30 bg-red-500/10 px-3 py-2 text-xs text-red-400">
+            ⛔ Ce compte a été banni{p.banned_reason ? ` — motif : ${p.banned_reason}` : ""}.
+          </div>
+        )}
+        <div className="flex items-start gap-3">
+          <Avatar seed={p.avatar_seed} size="lg" />
+          <div className="min-w-0 flex-1 space-y-1">
+            <p className="truncate text-lg font-bold">
+              {p.first_name} {p.last_name}
+            </p>
+            <p className="truncate text-xs text-neutral-500">@{p.username}</p>
+            <Badge karma={karmaScore} />
+            {p.bio && <p className="mt-1 text-sm text-neutral-300">{p.bio}</p>}
+          </div>
+        </div>
+
+        <div className="flex flex-wrap gap-2">
+          <FollowButton username={p.username} />
+          <BlockButton username={p.username} />
         </div>
       </header>
 
-      <div className="grid grid-cols-4 gap-2">
-        <StatCard label="Karma" value={karmaScore} brand />
+      <div className="grid grid-cols-4 gap-2 text-center text-[11px]">
+        <MiniStat label="Karma" value={karmaScore} accent />
+        <MiniStat label="Posts" value={list.length} />
+        <MiniStat label="Abonnés" value={followersCount ?? 0} />
+        <MiniStat label="Abonnements" value={followingCount ?? 0} />
+      </div>
+
+      <div className="grid grid-cols-3 gap-2">
         <StatCard icon={<MessageCircle className="h-3 w-3" />} label="Posts" value={list.length} />
         <StatCard icon={<ThumbsUp className="h-3 w-3" />} label="Votes" value={totalVotes} />
         <StatCard icon={<Eye className="h-3 w-3" />} label="Vues" value={totalViews} />
@@ -83,7 +110,7 @@ export default async function UserProfilePage({ params }: Props) {
 
       {list.length === 0 ? (
         <p className="py-8 text-center text-sm text-neutral-500">
-          Cet utilisateur n'a pas encore publié sous son compte.
+          Aucune confession publique (l'utilisateur peut aussi poster en anonyme).
         </p>
       ) : (
         <div className="space-y-3">
@@ -100,28 +127,29 @@ function StatCard({
   icon,
   label,
   value,
-  brand,
 }: {
-  icon?: React.ReactNode;
+  icon: React.ReactNode;
   label: string;
   value: number;
-  brand?: boolean;
 }) {
   return (
-    <div
-      className={`rounded-2xl border p-3 text-center ${
-        brand ? "border-brand/30 bg-brand/10" : "border-border bg-bg-card"
-      }`}
-    >
-      <div
-        className={`text-lg font-extrabold tabular-nums ${brand ? "text-brand" : "text-neutral-100"}`}
-      >
-        {compactNumber(value)}
-      </div>
+    <div className="rounded-2xl border border-border bg-bg-card p-3 text-center">
+      <div className="text-lg font-extrabold tabular-nums">{compactNumber(value)}</div>
       <div className="mt-0.5 flex items-center justify-center gap-1 text-[10px] uppercase tracking-wider text-neutral-500">
         {icon}
         {label}
       </div>
+    </div>
+  );
+}
+
+function MiniStat({ label, value, accent }: { label: string; value: number; accent?: boolean }) {
+  return (
+    <div className="rounded-xl border border-border bg-bg-soft px-2 py-1.5">
+      <div className={`text-sm font-bold tabular-nums ${accent ? "text-brand" : "text-neutral-100"}`}>
+        {compactNumber(value)}
+      </div>
+      <div className="text-[10px] text-neutral-500">{label}</div>
     </div>
   );
 }

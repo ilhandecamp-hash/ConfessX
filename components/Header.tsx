@@ -5,6 +5,7 @@ import Image from "next/image";
 import { Bookmark, Plus } from "lucide-react";
 import { SearchBar } from "./SearchBar";
 import { AuthMenu } from "./AuthMenu";
+import { NotificationsBell } from "./NotificationsBell";
 
 export function Header() {
   return (
@@ -26,6 +27,7 @@ export function Header() {
         </div>
 
         <nav className="flex shrink-0 items-center gap-1">
+          <NotificationsBell />
           <Link
             href="/bookmarks"
             className="grid h-9 w-9 place-items-center rounded-full text-neutral-400 transition hover:bg-bg-soft hover:text-neutral-100"
