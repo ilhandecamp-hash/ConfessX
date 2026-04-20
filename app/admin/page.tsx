@@ -450,25 +450,52 @@ function UsersSection({ secret }: { secret: string }) {
     // Optimistic: retire immédiatement.
     setUsers((prev) => prev.filter((x) => x.id !== u.id));
 
+    let deleteData: { debug?: unknown; error?: string } | null = null;
+
     try {
       const res = await fetch(`/api/admin/users/${u.id}${purge ? "?purge=1" : ""}`, {
         method: "DELETE",
         headers,
       });
-      const data = await res.json().catch(() => ({ error: "Erreur inconnue." }));
+      deleteData = await res.json().catch(() => ({ error: "Erreur inconnue." }));
       if (res.ok) {
         showFlash(`@${u.username} supprimé${purge ? " + contenu purgé" : ""}.`);
       } else {
-        // Affiche le debug complet → utile pour diagnostiquer
-        const debugTxt = data.debug ? "\n\nDebug: " + JSON.stringify(data.debug, null, 2) : "";
-        alert("Erreur : " + (data.error || res.status) + debugTxt);
-        console.error("[admin delete error]", data);
+        const debugTxt = deleteData?.debug
+          ? "\n\nDebug: " + JSON.stringify(deleteData.debug, null, 2)
+          : "";
+        alert("Erreur : " + (deleteData?.error || res.status) + debugTxt);
+        console.error("[admin delete error]", deleteData);
       }
     } catch (e) {
       alert("Erreur réseau : " + String(e));
     } finally {
       await refresh();
     }
+
+    // Post-refresh : vérifie que le user a vraiment disparu. Sinon → diagnostic.
+    setTimeout(async () => {
+      try {
+        const diagRes = await fetch(`/api/admin/diag/${u.id}`, { headers, cache: "no-store" });
+        if (!diagRes.ok) return;
+        const diag = await diagRes.json();
+        if (diag.profile_exists || diag.auth_user_exists) {
+          const msg =
+            `⚠️ @${u.username} est toujours en base après suppression !\n\n` +
+            `Diagnostic :\n${JSON.stringify(diag, null, 2)}\n\n` +
+            (deleteData?.debug
+              ? `Réponse delete :\n${JSON.stringify(deleteData.debug, null, 2)}\n\n`
+              : "") +
+            `→ Probable cause : un trigger 'handle_new_user' recrée le profile automatiquement (pattern de tutos Supabase).\n` +
+            `→ Solution : exécute supabase/migration_v7_fix.sql dans le SQL Editor.`;
+          alert(msg);
+          console.error("[admin delete — user persisted]", { diag, deleteData });
+          await refresh();
+        }
+      } catch {
+        /* silencieux */
+      }
+    }, 500);
   }
 
   return (
