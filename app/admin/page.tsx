@@ -447,55 +447,47 @@ function UsersSection({ secret }: { secret: string }) {
     );
     if (typed !== prefix) return;
 
-    // Optimistic: retire immédiatement.
     setUsers((prev) => prev.filter((x) => x.id !== u.id));
 
-    let deleteData: { debug?: unknown; error?: string } | null = null;
+    const report: Record<string, unknown> = { username: u.username, purge };
 
+    // 1. Delete
     try {
       const res = await fetch(`/api/admin/users/${u.id}${purge ? "?purge=1" : ""}`, {
         method: "DELETE",
         headers,
       });
-      deleteData = await res.json().catch(() => ({ error: "Erreur inconnue." }));
-      if (res.ok) {
-        showFlash(`@${u.username} supprimé${purge ? " + contenu purgé" : ""}.`);
-      } else {
-        const debugTxt = deleteData?.debug
-          ? "\n\nDebug: " + JSON.stringify(deleteData.debug, null, 2)
-          : "";
-        alert("Erreur : " + (deleteData?.error || res.status) + debugTxt);
-        console.error("[admin delete error]", deleteData);
-      }
+      report.delete_status = res.status;
+      report.delete_response = await res.json().catch(() => ({ error: "Invalid JSON" }));
     } catch (e) {
-      alert("Erreur réseau : " + String(e));
-    } finally {
-      await refresh();
+      report.delete_network_error = String(e);
     }
 
-    // Post-refresh : vérifie que le user a vraiment disparu. Sinon → diagnostic.
-    setTimeout(async () => {
-      try {
-        const diagRes = await fetch(`/api/admin/diag/${u.id}`, { headers, cache: "no-store" });
-        if (!diagRes.ok) return;
-        const diag = await diagRes.json();
-        if (diag.profile_exists || diag.auth_user_exists) {
-          const msg =
-            `⚠️ @${u.username} est toujours en base après suppression !\n\n` +
-            `Diagnostic :\n${JSON.stringify(diag, null, 2)}\n\n` +
-            (deleteData?.debug
-              ? `Réponse delete :\n${JSON.stringify(deleteData.debug, null, 2)}\n\n`
-              : "") +
-            `→ Probable cause : un trigger 'handle_new_user' recrée le profile automatiquement (pattern de tutos Supabase).\n` +
-            `→ Solution : exécute supabase/migration_v7_fix.sql dans le SQL Editor.`;
-          alert(msg);
-          console.error("[admin delete — user persisted]", { diag, deleteData });
-          await refresh();
-        }
-      } catch {
-        /* silencieux */
-      }
-    }, 500);
+    // 2. Refresh list
+    await refresh();
+
+    // 3. Diag direct après delete — quoi qu'il arrive
+    try {
+      const diagRes = await fetch(`/api/admin/diag/${u.id}`, { headers, cache: "no-store" });
+      report.diag_status = diagRes.status;
+      report.diag = await diagRes.json().catch(() => ({ error: "Invalid JSON" }));
+    } catch (e) {
+      report.diag_network_error = String(e);
+    }
+
+    // 4. TOUJOURS afficher le rapport complet (succès ET échec)
+    const diag = (report.diag as { profile_exists?: boolean; auth_user_exists?: boolean }) || {};
+    const stillThere = !!(diag.profile_exists || diag.auth_user_exists);
+    const header = stillThere
+      ? `❌ @${u.username} EST TOUJOURS EN BASE après suppression !\n\n` +
+        `→ Si tu n'as pas encore fait migration_v8.sql : fais-le maintenant.\n` +
+        `→ Sinon, envoie-moi ce rapport complet :\n\n`
+      : `✅ @${u.username} supprimé. Rapport :\n\n`;
+
+    alert(header + JSON.stringify(report, null, 2));
+    console.log("[admin delete REPORT]", report);
+
+    if (stillThere) await refresh();
   }
 
   return (
