@@ -466,28 +466,78 @@ function UsersSection({ secret }: { secret: string }) {
     // 2. Refresh list
     await refresh();
 
-    // 3. Diag direct après delete — quoi qu'il arrive
+    // 3. Diag avec lookup par username → détecte re-signup
     try {
-      const diagRes = await fetch(`/api/admin/diag/${u.id}`, { headers, cache: "no-store" });
+      const diagRes = await fetch(
+        `/api/admin/diag/${u.id}?username=${encodeURIComponent(u.username)}`,
+        { headers, cache: "no-store" },
+      );
       report.diag_status = diagRes.status;
       report.diag = await diagRes.json().catch(() => ({ error: "Invalid JSON" }));
     } catch (e) {
       report.diag_network_error = String(e);
     }
 
-    // 4. TOUJOURS afficher le rapport complet (succès ET échec)
-    const diag = (report.diag as { profile_exists?: boolean; auth_user_exists?: boolean }) || {};
-    const stillThere = !!(diag.profile_exists || diag.auth_user_exists);
-    const header = stillThere
-      ? `❌ @${u.username} EST TOUJOURS EN BASE après suppression !\n\n` +
-        `→ Si tu n'as pas encore fait migration_v8.sql : fais-le maintenant.\n` +
-        `→ Sinon, envoie-moi ce rapport complet :\n\n`
-      : `✅ @${u.username} supprimé. Rapport :\n\n`;
+    const diag = (report.diag as {
+      profile_exists?: boolean;
+      auth_user_exists?: boolean;
+      reappeared_as_different_id?: { id: string }[];
+    }) || {};
+
+    const sameIdStillThere = !!(diag.profile_exists || diag.auth_user_exists);
+    const reappearedDiff = (diag.reappeared_as_different_id ?? []).length > 0;
+    const stillThere = sameIdStillThere || reappearedDiff;
+
+    let header: string;
+    if (!stillThere) {
+      header = `✅ @${u.username} supprimé. Rapport :\n\n`;
+    } else if (reappearedDiff) {
+      header =
+        `⚠️ @${u.username} a été supprimé MAIS un NOUVEAU @${u.username} a été recréé avec un id différent.\n\n` +
+        `→ Quelqu'un re-signup pendant ou après ta suppression.\n` +
+        `→ Es-tu connecté en tant que @${u.username} dans un autre onglet ? Déconnecte-toi.\n` +
+        `→ Clique "💥 Force delete" à côté du user pour tous les supprimer d'un coup.\n\n` +
+        `Rapport :\n\n`;
+    } else {
+      header =
+        `❌ @${u.username} EST TOUJOURS EN BASE avec le même id !\n\n` +
+        `→ Vérifie que migration_v8.sql a bien tourné.\n\n` +
+        `Rapport :\n\n`;
+    }
 
     alert(header + JSON.stringify(report, null, 2));
     console.log("[admin delete REPORT]", report);
 
     if (stillThere) await refresh();
+  }
+
+  // Force-delete par username (ignore l'UUID, bombarde tous les ilhoun)
+  async function forceDeleteByUsername(u: AdminUser) {
+    if (
+      !confirm(
+        `💥 FORCE supprimer TOUS les comptes @${u.username} (peu importe leur UUID) ?\n\n` +
+          `À utiliser si un user re-signup automatiquement après chaque delete.`,
+      )
+    )
+      return;
+
+    setUsers((prev) => prev.filter((x) => x.username !== u.username));
+
+    try {
+      const res = await fetch(
+        `/api/admin/users/by-username/${encodeURIComponent(u.username)}?purge=1`,
+        { method: "DELETE", headers },
+      );
+      const data = await res.json();
+      alert(
+        (data.ok ? "✅" : "⚠️") + ` Force delete @${u.username}\n\n` + JSON.stringify(data, null, 2),
+      );
+      console.log("[admin force delete]", data);
+    } catch (e) {
+      alert("Erreur réseau : " + String(e));
+    } finally {
+      await refresh();
+    }
   }
 
   return (
@@ -592,6 +642,13 @@ function UsersSection({ secret }: { secret: string }) {
                 >
                   <Trash2 className="h-3 w-3" />
                   Purge totale
+                </button>
+                <button
+                  onClick={() => forceDeleteByUsername(u)}
+                  className="flex items-center gap-1 rounded-lg bg-red-600/40 px-2 py-1 text-[11px] font-bold text-red-200 hover:bg-red-600/60"
+                  title="Supprime TOUS les comptes avec ce username (en boucle jusqu'à ce qu'aucun ne reste)"
+                >
+                  💥 Force
                 </button>
               </div>
             </div>
