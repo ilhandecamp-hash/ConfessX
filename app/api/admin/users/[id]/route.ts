@@ -7,23 +7,13 @@ export const dynamic = "force-dynamic";
 
 interface Params { params: { id: string } }
 
-function isAlreadyGoneError(msg: string): boolean {
-  const lower = msg.toLowerCase();
-  return (
-    lower.includes("not found") ||
-    lower.includes("does not exist") ||
-    lower.includes("user_not_found") ||
-    lower.includes("no rows")
-  );
-}
-
 // DELETE /api/admin/users/:id?purge=1
 //
-// Séquence atomique garantie :
-//   1. RPC admin_force_delete_user (SECURITY DEFINER, bypass RLS) → supprime
-//      profile + éventuellement posts/comments, retourne compteurs exacts.
-//   2. auth.admin.deleteUser → retire la row dans auth.users (+ sessions).
-//   3. Vérification SELECT : le profile doit être absent après.
+// Approche NUCLEAIRE :
+//   1. RPC admin_nuke_user (SECURITY DEFINER) → supprime profile + auth.users
+//      directement en SQL, ignore soft-delete Supabase.
+//   2. Si RPC absente → fallback via admin_force_delete_user + auth.admin.deleteUser(hard).
+//   3. Vérification finale : profile absent de la DB.
 export async function DELETE(req: Request, { params }: Params) {
   if (!checkAdminSecret(req.headers.get("x-admin-secret"))) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -35,55 +25,49 @@ export async function DELETE(req: Request, { params }: Params) {
 
   const debug: Record<string, unknown> = { id, purge };
 
-  // 1) RPC atomique (SECURITY DEFINER)
-  const rpcRes = await supabase.rpc("admin_force_delete_user", {
+  // 1) NUKE atomique : profile + auth.users en SQL pur
+  const nuke = await supabase.rpc("admin_nuke_user", {
     p_user_id: id,
     p_purge: purge,
   } as never);
-  if (rpcRes.error) {
-    debug.rpc_error = rpcRes.error.message;
-    // Fallback : delete direct via service role
-    if (purge) {
-      const p = await supabase.from("posts").delete().eq("user_id", id).select("id");
-      debug.posts_deleted_fallback = p.data?.length ?? 0;
-      if (p.error) debug.posts_error = p.error.message;
-      const c = await supabase.from("comments").delete().eq("user_id", id).select("id");
-      debug.comments_deleted_fallback = c.data?.length ?? 0;
-      if (c.error) debug.comments_error = c.error.message;
-    }
-    const prof = await supabase.from("profiles").delete().eq("id", id).select("id");
-    debug.profile_deleted_fallback = prof.data?.length ?? 0;
-    if (prof.error) debug.profile_error = prof.error.message;
+
+  if (nuke.error) {
+    debug.nuke_error = nuke.error.message;
+
+    // Fallback : admin_force_delete_user (v7) + auth.admin.deleteUser hard
+    const fallback = await supabase.rpc("admin_force_delete_user", {
+      p_user_id: id,
+      p_purge: purge,
+    } as never);
+    debug.force_delete_error = fallback.error?.message ?? null;
+    debug.force_delete_result = fallback.data ?? null;
+
+    // shouldSoftDelete: false (2e arg) — hard delete explicite
+    const authRes = await supabase.auth.admin.deleteUser(id, false);
+    debug.auth_error = authRes.error?.message ?? null;
   } else {
-    debug.rpc_result = rpcRes.data;
+    debug.nuke_result = nuke.data;
   }
 
-  // 2) Delete auth user
-  const authRes = await supabase.auth.admin.deleteUser(id);
-  debug.auth_error = authRes.error?.message ?? null;
-  const authGone = !authRes.error || isAlreadyGoneError(authRes.error.message);
+  // 2) Vérif finale
+  const verifyProfile = await supabase
+    .from("profiles")
+    .select("id")
+    .eq("id", id)
+    .maybeSingle();
+  debug.profile_still_exists = !!verifyProfile.data;
 
-  // 3) Vérif finale (avec cache-busting via pas de cache Supabase)
-  const verify = await supabase.from("profiles").select("id").eq("id", id).maybeSingle();
-  debug.profile_still_exists = !!verify.data;
+  const verifyAuth = await supabase.auth.admin.getUserById(id).catch(() => null);
+  debug.auth_still_exists = !!verifyAuth?.data?.user;
 
   console.log("[admin DELETE user]", JSON.stringify(debug));
 
-  if (verify.data) {
+  if (verifyProfile.data) {
     return NextResponse.json(
       {
         error:
-          "Le profile persiste malgré la suppression. La RPC 'admin_force_delete_user' existe-t-elle ? As-tu exécuté migration_v7.sql ? Sinon vérifie SUPABASE_SERVICE_ROLE_KEY sur Vercel.",
-        debug,
-      },
-      { status: 500 },
-    );
-  }
-
-  if (!authGone && authRes.error) {
-    return NextResponse.json(
-      {
-        error: `Profile supprimé mais delete auth.users a échoué : ${authRes.error.message}`,
+          "Le profile persiste malgré la suppression. " +
+          "Vérifie : (1) migration_v8.sql exécutée, (2) SUPABASE_SERVICE_ROLE_KEY correcte sur Vercel.",
         debug,
       },
       { status: 500 },

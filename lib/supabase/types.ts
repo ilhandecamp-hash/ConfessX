@@ -350,6 +350,15 @@ export type Database = {
           profile_deleted: number;
         };
       };
+      admin_nuke_user: {
+        Args: { p_user_id: string; p_purge?: boolean };
+        Returns: {
+          posts_deleted: number;
+          comments_deleted: number;
+          profile_deleted: number;
+          auth_deleted: number;
+        };
+      };
       mark_all_notifications_read: { Args: Record<string, never>; Returns: void };
       count_unread_notifications: { Args: Record<string, never>; Returns: number };
       list_notifications: {
