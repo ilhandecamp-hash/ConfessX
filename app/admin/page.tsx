@@ -382,9 +382,15 @@ function UsersSection({ secret }: { secret: string }) {
         cache: "no-store",
       });
       if (!res.ok) return;
-      const { users } = await res.json();
-      console.log(`[admin users refresh] ${users.length} users fetched:`, users.map((u: AdminUser) => u.username));
-      setUsers(users as AdminUser[]);
+      const json = await res.json();
+      const users = json.users as AdminUser[];
+      console.log(
+        `[admin users refresh] ${users.length} users fetched:`,
+        users.map((u) => u.username),
+        "diag:",
+        json._diag,
+      );
+      setUsers(users);
     } finally {
       setLoading(false);
     }
