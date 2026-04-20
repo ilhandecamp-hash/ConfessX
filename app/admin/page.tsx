@@ -8,9 +8,12 @@ import {
   KeyRound,
   Loader2,
   LogOut,
+  Megaphone,
+  Plus,
   RotateCcw,
   Search,
   Shield,
+  Sparkles,
   Trash2,
   Undo2,
   UserCog,
@@ -27,7 +30,19 @@ const SECRET_KEY = "confessx_admin_secret";
 
 type Scope = "all" | "pending" | "comments" | "reset_counters";
 type ListScope = "reported" | "pending" | "all";
-type Section = "moderation" | "users";
+type Section = "moderation" | "users" | "announcements";
+type AnnouncementType = "info" | "update" | "warning" | "event";
+
+interface AdminAnnouncement {
+  id: string;
+  title: string;
+  body: string;
+  type: AnnouncementType;
+  active: boolean;
+  dismissible: boolean;
+  created_at: string;
+  expires_at: string | null;
+}
 
 interface Stats {
   total: number;
@@ -172,9 +187,12 @@ function Dashboard({ secret, onLogout }: { secret: string; onLogout: () => void 
       <div className="flex gap-1 rounded-full bg-bg-soft p-0.5">
         <TabBtn active={section === "moderation"} onClick={() => setSection("moderation")} icon={<Flag className="h-3.5 w-3.5" />} label="Modération" />
         <TabBtn active={section === "users"} onClick={() => setSection("users")} icon={<Users className="h-3.5 w-3.5" />} label="Utilisateurs" />
+        <TabBtn active={section === "announcements"} onClick={() => setSection("announcements")} icon={<Megaphone className="h-3.5 w-3.5" />} label="Annonces" />
       </div>
 
-      {section === "moderation" ? <ModerationSection secret={secret} /> : <UsersSection secret={secret} />}
+      {section === "moderation" && <ModerationSection secret={secret} />}
+      {section === "users" && <UsersSection secret={secret} />}
+      {section === "announcements" && <AnnouncementsSection secret={secret} />}
 
       <Link href="/" className="block text-center text-xs text-neutral-600 hover:text-neutral-400">
         ← Retour au site
@@ -428,16 +446,25 @@ function UsersSection({ secret }: { secret: string }) {
         : `Supprime le compte @${u.username} (posts/commentaires restent, deviennent anonymes). Tape "${prefix}".`,
     );
     if (typed !== prefix) return;
-    const res = await fetch(`/api/admin/users/${u.id}${purge ? "?purge=1" : ""}`, {
-      method: "DELETE",
-      headers,
-    });
-    if (res.ok) {
-      showFlash(`@${u.username} supprimé${purge ? " + contenu purgé" : ""}.`);
-      setUsers((prev) => prev.filter((x) => x.id !== u.id));
-    } else {
-      const { error } = await res.json();
-      alert("Erreur : " + error);
+
+    // Optimistic: retire immédiatement de l'UI.
+    setUsers((prev) => prev.filter((x) => x.id !== u.id));
+
+    try {
+      const res = await fetch(`/api/admin/users/${u.id}${purge ? "?purge=1" : ""}`, {
+        method: "DELETE",
+        headers,
+      });
+      if (res.ok) {
+        showFlash(`@${u.username} supprimé${purge ? " + contenu purgé" : ""}.`);
+      } else {
+        const { error } = await res.json().catch(() => ({ error: "Erreur inconnue." }));
+        alert("Erreur : " + error);
+        await refresh();
+      }
+    } catch {
+      alert("Erreur réseau.");
+      await refresh();
     }
   }
 
@@ -601,6 +628,228 @@ function DangerBtn({
       {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : icon}
       {label}
     </button>
+  );
+}
+
+// ─── Section annonces ──────────────────────────────────────────────
+
+function AnnouncementsSection({ secret }: { secret: string }) {
+  const [items, setItems] = useState<AdminAnnouncement[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [showForm, setShowForm] = useState(false);
+  const [title, setTitle] = useState("");
+  const [body, setBody] = useState("");
+  const [type, setType] = useState<AnnouncementType>("info");
+  const [dismissible, setDismissible] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
+
+  const headers = { "x-admin-secret": secret };
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    try {
+      const res = await fetch("/api/admin/announcements", { headers, cache: "no-store" });
+      if (!res.ok) return;
+      const { announcements } = await res.json();
+      setItems(announcements as AdminAnnouncement[]);
+    } finally {
+      setLoading(false);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [secret]);
+
+  useEffect(() => {
+    void load();
+  }, [load]);
+
+  async function create(e: React.FormEvent) {
+    e.preventDefault();
+    setErr(null);
+    if (title.trim().length < 1 || body.trim().length < 1) return;
+    setSaving(true);
+    try {
+      const res = await fetch("/api/admin/announcements", {
+        method: "POST",
+        headers: { ...headers, "Content-Type": "application/json" },
+        body: JSON.stringify({
+          title: title.trim(),
+          body: body.trim(),
+          type,
+          dismissible,
+          active: true,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setErr(data.error || "Erreur.");
+        return;
+      }
+      setTitle("");
+      setBody("");
+      setType("info");
+      setDismissible(true);
+      setShowForm(false);
+      await load();
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function toggleActive(a: AdminAnnouncement) {
+    setItems((prev) =>
+      prev.map((x) => (x.id === a.id ? { ...x, active: !x.active } : x)),
+    );
+    await fetch(`/api/admin/announcements/${a.id}`, {
+      method: "PATCH",
+      headers: { ...headers, "Content-Type": "application/json" },
+      body: JSON.stringify({ active: !a.active }),
+    });
+  }
+
+  async function remove(a: AdminAnnouncement) {
+    if (!confirm(`Supprimer l'annonce "${a.title}" ?`)) return;
+    setItems((prev) => prev.filter((x) => x.id !== a.id));
+    await fetch(`/api/admin/announcements/${a.id}`, { method: "DELETE", headers });
+  }
+
+  return (
+    <div className="space-y-4">
+      <div className="flex items-center justify-between">
+        <p className="text-xs text-neutral-500">
+          Les annonces actives apparaissent en bannière sur la home.
+        </p>
+        <button
+          onClick={() => setShowForm((v) => !v)}
+          className="flex items-center gap-1 rounded-full bg-brand px-3 py-1.5 text-xs font-bold text-white hover:bg-brand-hover"
+        >
+          {showForm ? <X className="h-3 w-3" /> : <Plus className="h-3 w-3" />}
+          {showForm ? "Fermer" : "Nouvelle annonce"}
+        </button>
+      </div>
+
+      {showForm && (
+        <form onSubmit={create} className="animate-slide-down space-y-3 rounded-2xl border border-border bg-bg-card p-4">
+          <label className="block">
+            <span className="mb-1 block text-[11px] font-semibold uppercase tracking-wider text-neutral-400">
+              Titre
+            </span>
+            <input
+              value={title}
+              onChange={(e) => setTitle(e.target.value.slice(0, 100))}
+              placeholder="Ex : Nouveauté — feed Abonnements"
+              className="w-full rounded-xl border border-border bg-bg-soft px-3 py-2 text-sm focus:border-brand focus:outline-none"
+              autoFocus
+            />
+          </label>
+          <label className="block">
+            <span className="mb-1 block text-[11px] font-semibold uppercase tracking-wider text-neutral-400">
+              Description (Markdown léger accepté : **gras** *italique* https://…)
+            </span>
+            <textarea
+              value={body}
+              onChange={(e) => setBody(e.target.value.slice(0, 2000))}
+              placeholder="Décris ce qui est nouveau…"
+              rows={4}
+              className="w-full resize-none rounded-xl border border-border bg-bg-soft px-3 py-2 text-sm focus:border-brand focus:outline-none"
+            />
+          </label>
+          <div className="flex items-center justify-between gap-3">
+            <label className="flex flex-1 flex-col gap-1">
+              <span className="text-[11px] font-semibold uppercase tracking-wider text-neutral-400">
+                Type
+              </span>
+              <select
+                value={type}
+                onChange={(e) => setType(e.target.value as AnnouncementType)}
+                className="rounded-xl border border-border bg-bg-soft px-3 py-2 text-sm focus:border-brand focus:outline-none"
+              >
+                <option value="info">ℹ️ Info</option>
+                <option value="update">✨ Mise à jour</option>
+                <option value="event">🎉 Événement</option>
+                <option value="warning">⚠️ Attention</option>
+              </select>
+            </label>
+            <label className="flex items-center gap-2 pt-5 text-xs text-neutral-300">
+              <input
+                type="checkbox"
+                checked={dismissible}
+                onChange={(e) => setDismissible(e.target.checked)}
+                className="h-4 w-4 accent-brand"
+              />
+              Masquable par les users
+            </label>
+          </div>
+          {err && (
+            <div className="rounded-xl border border-red-500/30 bg-red-500/10 px-3 py-2 text-xs text-red-400">
+              {err}
+            </div>
+          )}
+          <button
+            type="submit"
+            disabled={saving || !title.trim() || !body.trim()}
+            className="flex w-full items-center justify-center gap-2 rounded-xl bg-brand py-2.5 text-sm font-bold text-white transition hover:bg-brand-hover disabled:opacity-50"
+          >
+            {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}
+            Publier
+          </button>
+        </form>
+      )}
+
+      {loading ? (
+        <p className="py-6 text-center text-sm text-neutral-500">
+          <Loader2 className="mx-auto h-4 w-4 animate-spin" />
+        </p>
+      ) : items.length === 0 ? (
+        <p className="py-8 text-center text-sm text-neutral-500">Aucune annonce.</p>
+      ) : (
+        <div className="space-y-2">
+          {items.map((a) => (
+            <div
+              key={a.id}
+              className={cn(
+                "space-y-2 rounded-2xl border p-3",
+                a.active ? "border-brand/30 bg-bg-card" : "border-border bg-bg-soft/50 opacity-60",
+              )}
+            >
+              <div className="flex items-start justify-between gap-2">
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-center gap-2">
+                    <span className="rounded-full bg-bg-soft px-2 py-0.5 text-[10px] uppercase text-neutral-400">
+                      {a.type}
+                    </span>
+                    <p className="truncate text-sm font-bold">{a.title}</p>
+                  </div>
+                  <p className="mt-1 whitespace-pre-wrap break-words text-xs text-neutral-400">{a.body}</p>
+                  <p className="mt-1 text-[10px] text-neutral-600">
+                    {formatRelative(a.created_at)}
+                  </p>
+                </div>
+              </div>
+              <div className="flex gap-2">
+                <button
+                  onClick={() => toggleActive(a)}
+                  className={cn(
+                    "flex-1 rounded-lg py-1.5 text-[11px] font-bold transition",
+                    a.active
+                      ? "bg-accent-awkward/15 text-accent-awkward hover:bg-accent-awkward/25"
+                      : "bg-green-500/15 text-green-400 hover:bg-green-500/25",
+                  )}
+                >
+                  {a.active ? "Désactiver" : "Activer"}
+                </button>
+                <button
+                  onClick={() => remove(a)}
+                  className="flex-1 rounded-lg bg-red-500/15 py-1.5 text-[11px] font-bold text-red-400 hover:bg-red-500/25"
+                >
+                  Supprimer
+                </button>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
   );
 }
 

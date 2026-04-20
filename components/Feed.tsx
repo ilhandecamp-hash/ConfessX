@@ -119,8 +119,14 @@ export function Feed({
       )}
 
       <div className="space-y-3">
-        {posts.map((p) => (
-          <PostCard key={p.id} post={p} />
+        {posts.map((p, i) => (
+          <div
+            key={p.id}
+            className="animate-fade-in-up"
+            style={{ animationDelay: `${Math.min(i, 8) * 40}ms` }}
+          >
+            <PostCard post={p} />
+          </div>
         ))}
       </div>
 

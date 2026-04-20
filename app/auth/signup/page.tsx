@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { ArrowLeft, Check, Loader2, UserPlus, X } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { useAuth } from "@/contexts/AuthContext";
 
 type UsernameState = "idle" | "checking" | "available" | "taken" | "invalid";
 
@@ -12,6 +13,7 @@ const USERNAME_RX = /^[a-zA-Z0-9_.-]{3,20}$/;
 
 export default function SignupPage() {
   const router = useRouter();
+  const { refresh } = useAuth();
   const [first, setFirst] = useState("");
   const [last, setLast] = useState("");
   const [username, setUsername] = useState("");
@@ -89,6 +91,7 @@ export default function SignupPage() {
         setError(data.error || "Erreur inconnue.");
         return;
       }
+      await refresh();
       router.push("/me");
       router.refresh();
     } finally {

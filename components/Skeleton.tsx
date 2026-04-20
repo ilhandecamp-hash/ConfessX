@@ -1,7 +1,7 @@
 import { cn } from "@/lib/utils";
 
 function Bar({ className }: { className?: string }) {
-  return <div className={cn("animate-pulse rounded bg-bg-soft", className)} />;
+  return <div className={cn("shimmer rounded", className)} />;
 }
 
 export function PostSkeleton() {

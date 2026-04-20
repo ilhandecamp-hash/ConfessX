@@ -222,6 +222,35 @@ export type Database = {
         Update: { read_at?: string | null };
         Relationships: [];
       };
+      announcements: {
+        Row: {
+          id: string;
+          title: string;
+          body: string;
+          type: "info" | "update" | "warning" | "event";
+          active: boolean;
+          dismissible: boolean;
+          created_at: string;
+          expires_at: string | null;
+        };
+        Insert: {
+          title: string;
+          body: string;
+          type?: "info" | "update" | "warning" | "event";
+          active?: boolean;
+          dismissible?: boolean;
+          expires_at?: string | null;
+        };
+        Update: {
+          title?: string;
+          body?: string;
+          type?: "info" | "update" | "warning" | "event";
+          active?: boolean;
+          dismissible?: boolean;
+          expires_at?: string | null;
+        };
+        Relationships: [];
+      };
       comment_votes: {
         Row: {
           id: string;

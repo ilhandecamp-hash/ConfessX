@@ -6,6 +6,7 @@ import { Bookmark, Plus } from "lucide-react";
 import { SearchBar } from "./SearchBar";
 import { AuthMenu } from "./AuthMenu";
 import { NotificationsBell } from "./NotificationsBell";
+import { ThemeToggle } from "./ThemeToggle";
 
 export function Header() {
   return (
@@ -27,6 +28,7 @@ export function Header() {
         </div>
 
         <nav className="flex shrink-0 items-center gap-1">
+          <ThemeToggle />
           <NotificationsBell />
           <Link
             href="/bookmarks"

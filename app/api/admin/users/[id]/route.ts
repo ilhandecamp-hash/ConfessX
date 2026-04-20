@@ -7,7 +7,7 @@ export const dynamic = "force-dynamic";
 
 interface Params { params: { id: string } }
 
-// DELETE /api/admin/users/:id?purge=1 → supprime user (+ optionnellement tous ses posts/comments)
+// DELETE /api/admin/users/:id?purge=1 — robuste : ne fail jamais si le user a déjà été partiellement supprimé.
 export async function DELETE(req: Request, { params }: Params) {
   if (!checkAdminSecret(req.headers.get("x-admin-secret"))) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -18,17 +18,26 @@ export async function DELETE(req: Request, { params }: Params) {
   const supabase = createServiceClient();
 
   if (purge) {
-    // Delete all user's posts & comments first (bypass ownership check)
+    // On purge posts & comments de ce user avant.
     await supabase.from("posts").delete().eq("user_id", params.id);
     await supabase.from("comments").delete().eq("user_id", params.id);
   }
 
-  // Delete profile (CASCADE cleans follows/blocks/hidden/notifications)
+  // Supprime le profile (cascade pour follows/blocks/hidden/notifications).
   await supabase.from("profiles").delete().eq("id", params.id);
 
-  // Delete auth user
+  // Supprime l'user Supabase Auth — ignore si déjà parti.
   const { error } = await supabase.auth.admin.deleteUser(params.id);
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  if (error) {
+    const msg = error.message.toLowerCase();
+    const alreadyGone =
+      msg.includes("not found") ||
+      msg.includes("does not exist") ||
+      msg.includes("user_not_found");
+    if (!alreadyGone) {
+      return NextResponse.json({ error: error.message }, { status: 500 });
+    }
+  }
 
   return NextResponse.json({ ok: true, purged: purge });
 }
@@ -53,10 +62,9 @@ export async function PATCH(req: Request, { params }: Params) {
     const reason = typeof body.reason === "string" ? body.reason : null;
     const { error } = await supabase
       .from("profiles")
-      .update({ banned: true, banned_reason: reason, banned_at: new Date().toISOString() })
+      .update({ banned: true, banned_reason: reason, banned_at: new Date().toISOString() } as never)
       .eq("id", params.id);
     if (error) return NextResponse.json({ error: error.message }, { status: 500 });
-    // Révoque la session Supabase
     await supabase.auth.admin.updateUserById(params.id, { ban_duration: "87600h" });
     return NextResponse.json({ ok: true });
   }
@@ -64,7 +72,7 @@ export async function PATCH(req: Request, { params }: Params) {
   if (action === "unban") {
     const { error } = await supabase
       .from("profiles")
-      .update({ banned: false, banned_reason: null, banned_at: null })
+      .update({ banned: false, banned_reason: null, banned_at: null } as never)
       .eq("id", params.id);
     if (error) return NextResponse.json({ error: error.message }, { status: 500 });
     await supabase.auth.admin.updateUserById(params.id, { ban_duration: "none" });

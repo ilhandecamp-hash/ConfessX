@@ -4,9 +4,11 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { ArrowLeft, Loader2, LogIn } from "lucide-react";
+import { useAuth } from "@/contexts/AuthContext";
 
 export default function LoginPage() {
   const router = useRouter();
+  const { refresh } = useAuth();
   const [identifier, setIdentifier] = useState("");
   const [password, setPassword] = useState("");
   const [busy, setBusy] = useState(false);
@@ -27,6 +29,9 @@ export default function LoginPage() {
         setError(data.error || "Erreur inconnue.");
         return;
       }
+      // Rafraîchit le AuthContext côté client pour que le header se mette à jour
+      // sans reload manuel.
+      await refresh();
       router.push("/");
       router.refresh();
     } finally {

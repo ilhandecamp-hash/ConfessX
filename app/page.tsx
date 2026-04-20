@@ -1,3 +1,4 @@
+import { AnnouncementBanner } from "@/components/AnnouncementBanner";
 import { BannerHero } from "@/components/BannerHero";
 import { Feed } from "@/components/Feed";
 import { createAnonServerClient } from "@/lib/supabase/server";
@@ -32,6 +33,7 @@ export default async function HomePage() {
   return (
     <>
       <BannerHero />
+      <AnnouncementBanner />
       <Feed initialPosts={initialPosts} highlight={highlightPost} />
     </>
   );

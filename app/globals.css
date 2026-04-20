@@ -2,14 +2,31 @@
 @tailwind components;
 @tailwind utilities;
 
-:root {
-  color-scheme: dark;
+@layer base {
+  /* Dark = défaut */
+  :root,
+  html.dark {
+    --bg: 10 10 10;
+    --bg-soft: 20 20 20;
+    --bg-card: 26 26 26;
+    --border: 38 38 38;
+    --border-strong: 64 64 64;
+    color-scheme: dark;
+  }
+
+  html.light {
+    --bg: 250 250 250;
+    --bg-soft: 244 244 245;
+    --bg-card: 255 255 255;
+    --border: 229 229 229;
+    --border-strong: 212 212 212;
+    color-scheme: light;
+  }
 }
 
-html,
-body {
-  background: #0a0a0a;
-  color: #fafafa;
+html, body {
+  background: rgb(var(--bg));
+  color: rgb(var(--fg, 245 245 245));
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }
@@ -19,31 +36,66 @@ body {
   overscroll-behavior-y: none;
 }
 
-/* Mobile: pas de zoom sur focus input */
-input,
-textarea,
-select {
-  font-size: 16px;
-}
+/* ----------------------------------------------------
+   Surcharges texte pour le thème light
+   (on n'a pas migré toutes les classes text-neutral-*,
+    on les adapte ici via CSS cascade)
+---------------------------------------------------- */
+html.light body { color: #171717; }
+html.light .text-neutral-100 { color: #0a0a0a; }
+html.light .text-neutral-200 { color: #171717; }
+html.light .text-neutral-300 { color: #262626; }
+html.light .text-neutral-400 { color: #525252; }
+html.light .text-neutral-500 { color: #737373; }
+html.light .text-neutral-600 { color: #a3a3a3; }
+html.light .placeholder-neutral-600::placeholder { color: #a3a3a3; }
 
-/* Scrollbar discrète */
-::-webkit-scrollbar {
-  width: 6px;
-  height: 6px;
-}
-::-webkit-scrollbar-track {
-  background: transparent;
-}
+/* Mobile: pas de zoom sur focus input */
+input, textarea, select { font-size: 16px; }
+
+/* Scrollbar */
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: transparent; }
 ::-webkit-scrollbar-thumb {
-  background: #262626;
+  background: rgb(var(--border));
   border-radius: 9999px;
 }
 ::-webkit-scrollbar-thumb:hover {
-  background: #404040;
+  background: rgb(var(--border-strong));
 }
 
 /* Selection */
 ::selection {
   background: #ff3b6b;
   color: white;
+}
+
+/* ----------------------------------------------------
+   Animations cool
+---------------------------------------------------- */
+
+/* Shimmer overlay pour skeletons plus stylés */
+.shimmer {
+  background: linear-gradient(
+    90deg,
+    rgb(var(--bg-soft)) 0%,
+    rgb(var(--border)) 50%,
+    rgb(var(--bg-soft)) 100%
+  );
+  background-size: 200% 100%;
+  animation: shimmer 2s linear infinite;
+}
+@keyframes shimmer {
+  0%   { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+
+/* Respect préférence "motion reduced" */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
 }

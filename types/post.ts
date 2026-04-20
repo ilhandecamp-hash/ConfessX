@@ -59,6 +59,19 @@ export interface Profile {
   created_at: string;
 }
 
+export type AnnouncementType = "info" | "update" | "warning" | "event";
+
+export interface Announcement {
+  id: string;
+  title: string;
+  body: string;
+  type: AnnouncementType;
+  active: boolean;
+  dismissible: boolean;
+  created_at: string;
+  expires_at: string | null;
+}
+
 export type NotificationType = "comment" | "reply" | "follow" | "mention";
 
 export interface NotificationItem {
