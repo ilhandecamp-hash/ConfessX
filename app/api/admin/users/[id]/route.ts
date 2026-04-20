@@ -18,11 +18,12 @@ function isAlreadyGoneError(msg: string): boolean {
 }
 
 // DELETE /api/admin/users/:id?purge=1
-// Stratégie :
-//   1. (purge) supprimer posts + comments de ce user
-//   2. Supprimer explicitement le profile (géré par service_role, bypass RLS)
-//   3. Supprimer auth.users (cascade sur profile déjà vidé = no-op)
-//   4. Collecter erreurs non-triviales, renvoyer succès si user effectivement parti
+//
+// Stratégie robuste avec diagnostics :
+// 1. (purge) Delete posts + comments du user
+// 2. Delete auth.users → cascade FK supprime profile si encore là
+// 3. Delete profile explicitement (au cas où auth.deleteUser a soft-deleted)
+// 4. Vérifier que le profile a bien disparu → sinon retourne 500 avec debug
 export async function DELETE(req: Request, { params }: Params) {
   if (!checkAdminSecret(req.headers.get("x-admin-secret"))) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -32,34 +33,54 @@ export async function DELETE(req: Request, { params }: Params) {
   const supabase = createServiceClient();
   const id = params.id;
 
-  const fatal: string[] = [];
+  const debug: Record<string, unknown> = { id, purge };
 
   if (purge) {
-    const postsDel = await supabase.from("posts").delete().eq("user_id", id);
-    if (postsDel.error) fatal.push(`posts: ${postsDel.error.message}`);
+    const r = await supabase.from("posts").delete().eq("user_id", id).select("id");
+    debug.posts_deleted = r.data?.length ?? 0;
+    if (r.error) debug.posts_error = r.error.message;
 
-    const commentsDel = await supabase.from("comments").delete().eq("user_id", id);
-    if (commentsDel.error) fatal.push(`comments: ${commentsDel.error.message}`);
+    const r2 = await supabase.from("comments").delete().eq("user_id", id).select("id");
+    debug.comments_deleted = r2.data?.length ?? 0;
+    if (r2.error) debug.comments_error = r2.error.message;
   }
 
-  // Supprimer le profile (idempotent)
-  const profileDel = await supabase.from("profiles").delete().eq("id", id);
-  if (profileDel.error) fatal.push(`profile: ${profileDel.error.message}`);
+  // 1) Delete auth user
+  const authRes = await supabase.auth.admin.deleteUser(id);
+  debug.auth_error = authRes.error?.message ?? null;
+  const authGone = !authRes.error || isAlreadyGoneError(authRes.error.message);
 
-  // Supprimer l'utilisateur Auth
-  const { error: authErr } = await supabase.auth.admin.deleteUser(id);
-  if (authErr && !isAlreadyGoneError(authErr.message)) {
-    fatal.push(`auth: ${authErr.message}`);
-  }
+  // 2) Delete profile (au cas où Auth soft-delete ne cascade pas)
+  const profileRes = await supabase.from("profiles").delete().eq("id", id).select("id");
+  debug.profile_deleted = profileRes.data?.length ?? 0;
+  if (profileRes.error) debug.profile_error = profileRes.error.message;
 
-  if (fatal.length > 0) {
+  // 3) Vérif finale
+  const verify = await supabase.from("profiles").select("id").eq("id", id).maybeSingle();
+  debug.profile_still_exists = !!verify.data;
+
+  console.log("[admin DELETE user]", JSON.stringify(debug));
+
+  if (verify.data) {
     return NextResponse.json(
-      { error: fatal.join(" | "), purged: purge },
+      {
+        error:
+          "Le profile persiste en base malgré la suppression. " +
+          "Vérifie que SUPABASE_SERVICE_ROLE_KEY sur Vercel est bien la clé 'service_role' (pas le publishable/anon).",
+        debug,
+      },
       { status: 500 },
     );
   }
 
-  return NextResponse.json({ ok: true, purged: purge });
+  if (!authGone && authRes.error) {
+    return NextResponse.json(
+      { error: `Auth delete failed: ${authRes.error.message}`, debug },
+      { status: 500 },
+    );
+  }
+
+  return NextResponse.json({ ok: true, purged: purge, debug });
 }
 
 // PATCH /api/admin/users/:id  { action: 'ban'|'unban'|'reset_password', reason?, new_password? }

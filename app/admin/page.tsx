@@ -455,16 +455,18 @@ function UsersSection({ secret }: { secret: string }) {
         method: "DELETE",
         headers,
       });
+      const data = await res.json().catch(() => ({ error: "Erreur inconnue." }));
       if (res.ok) {
         showFlash(`@${u.username} supprimé${purge ? " + contenu purgé" : ""}.`);
       } else {
-        const { error } = await res.json().catch(() => ({ error: "Erreur inconnue." }));
-        alert("Erreur : " + error);
+        // Affiche le debug complet → utile pour diagnostiquer
+        const debugTxt = data.debug ? "\n\nDebug: " + JSON.stringify(data.debug, null, 2) : "";
+        alert("Erreur : " + (data.error || res.status) + debugTxt);
+        console.error("[admin delete error]", data);
       }
-    } catch {
-      alert("Erreur réseau.");
+    } catch (e) {
+      alert("Erreur réseau : " + String(e));
     } finally {
-      // Toujours re-sync avec le serveur, succès comme échec
       await refresh();
     }
   }
