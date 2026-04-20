@@ -374,12 +374,16 @@ function UsersSection({ secret }: { secret: string }) {
   const refresh = useCallback(async () => {
     setLoading(true);
     try {
-      const res = await fetch(`/api/admin/users${q ? `?q=${encodeURIComponent(q)}` : ""}`, {
+      // Cache-buster : force le navigateur à ignorer toute version cachée
+      const cacheBuster = `_t=${Date.now()}`;
+      const qParam = q ? `q=${encodeURIComponent(q)}&` : "";
+      const res = await fetch(`/api/admin/users?${qParam}${cacheBuster}`, {
         headers,
         cache: "no-store",
       });
       if (!res.ok) return;
       const { users } = await res.json();
+      console.log(`[admin users refresh] ${users.length} users fetched:`, users.map((u: AdminUser) => u.username));
       setUsers(users as AdminUser[]);
     } finally {
       setLoading(false);
@@ -548,15 +552,29 @@ function UsersSection({ secret }: { secret: string }) {
         </div>
       )}
 
-      <div className="relative">
-        <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-neutral-500" />
-        <input
-          value={q}
-          onChange={(e) => setQ(e.target.value)}
-          placeholder="Chercher un username…"
-          className="w-full rounded-full border border-border bg-bg-soft py-2 pl-9 pr-4 text-sm placeholder-neutral-600 focus:border-brand focus:outline-none"
-        />
+      <div className="flex items-center gap-2">
+        <div className="relative flex-1">
+          <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-neutral-500" />
+          <input
+            value={q}
+            onChange={(e) => setQ(e.target.value)}
+            placeholder="Chercher un username…"
+            className="w-full rounded-full border border-border bg-bg-soft py-2 pl-9 pr-4 text-sm placeholder-neutral-600 focus:border-brand focus:outline-none"
+          />
+        </div>
+        <button
+          onClick={() => void refresh()}
+          className="flex items-center gap-1 rounded-full border border-border bg-bg-soft px-3 py-2 text-xs font-semibold text-neutral-300 transition hover:border-brand hover:text-brand"
+          title="Recharger la liste depuis la DB"
+        >
+          <Loader2 className={cn("h-3.5 w-3.5", loading && "animate-spin")} />
+          Recharger
+        </button>
       </div>
+      <p className="text-[11px] text-neutral-600">
+        {users.length} user{users.length > 1 ? "s" : ""} affiché{users.length > 1 ? "s" : ""} ·
+        ouvre la console (F12) pour voir la liste brute.
+      </p>
 
       {loading ? (
         <p className="py-6 text-center text-sm text-neutral-500">
